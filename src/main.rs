@@ -1,36 +1,24 @@
 use macroquad::prelude::*;
+mod agent;
+
+use agent::Agent;
 
 #[macroquad::main("Ewolucja")]
 async fn main() {
-    let mut x = 10.0;
-    let mut y = 10.0;
-    let mut i = 1;
-    let mut j = 1;
+    
+    let mut agent =  Agent::new_with_position(10.0, 10.0, 5.0);
+    let mut agent1 = Agent::new_with_position(100.0, 50.0, 7.5);
+    let mut agent2 = Agent::new_with_position(20.0, 200.0, 10.0);
 
     loop{
-        if x >= screen_width() - 60.0 {
-            i = -1;
-        }
-        else if x <= 0.0 {
-            i = 1;
-        }
-        if y >= screen_height() - 40.0 {
-            j = -1;
-        }
-        else if y <= 0.0 {
-            j = 1;
-        }
         
-        
-        x += 1.0 * i as f32;
-        y += 1.0 * j as f32;
-
-
-
-
         clear_background(BLACK);
-        draw_rectangle(x, y, 60.0, 40.0, BLUE);
-        //draw_circle(x, y, 15.0, RED);
+        agent.update(screen_height(), screen_width());
+        agent.draw();
+        agent1.update(screen_height(), screen_width());
+        agent1.draw();
+        agent2.update(screen_height(), screen_width());
+        agent2.draw();
         next_frame().await
     }
 }
