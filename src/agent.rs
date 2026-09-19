@@ -49,9 +49,23 @@ impl Agent{
 
     }
 
-
-
     pub fn draw(&self){
         draw_circle(self.x, self.y, self.size, self.color)
     }
+
+    pub fn eat_food(&mut self, food_size: f32){
+        self.size += food_size * 1.0;
+    }
+
+
+    pub fn get_x(&self) -> f32{
+        self.x
+    }
+    pub fn get_y(&self) -> f32{
+        self.y
+    }
+    pub fn get_size(&self) -> f32{
+        self.size
+    }
+    
 }

@@ -37,6 +37,20 @@ impl World{
         for a in &mut self.agents{
             a.update(self.height, self.width);
         }
+
+        for a in &mut self.agents{
+            for f in &mut self.food{
+                let distance_sq = (a.get_x() - f.x).powi(2) + (a.get_y() - f.y).powi(2);
+                let radius_sum = a.get_size() + f.size;
+                if distance_sq < radius_sum * radius_sum {
+                    f.eaten = true;
+                    a.eat_food(f.size);
+                }
+            }
+        }
+
+        self.food.retain(|f| !f.eaten);
+
     }
 
     pub fn draw(&self){
@@ -55,7 +69,8 @@ impl World{
 struct Food{
     x: f32,
     y: f32,
-    size: f32
+    size: f32,
+    eaten: bool
 }
 
 impl Food{
@@ -66,7 +81,8 @@ impl Food{
         Food{
             x,
             y,
-            size
+            size,
+            eaten: false
         }
     }
 
