@@ -55,8 +55,16 @@ impl Terrain{
                 let x = col as f32 * self.tile_size;
                 let y = row as f32 * self.tile_size;
                 draw_rectangle(x, y, self.tile_size, self.tile_size, color);
+                draw_rectangle_lines(x, y, self.tile_size, self.tile_size, 1.0, BLACK);
             }
         }
     }
-   
+
+    pub fn get_width(&self) -> f32{
+        self.cols as f32 * self.tile_size
+    }
+
+    pub fn get_height(&self) -> f32{
+        self.rows as f32 * self.tile_size
+    }
 }

@@ -1,6 +1,7 @@
 use macroquad::prelude::*;
 mod world;
 mod agent;
+mod terrain;
 
 use world::World;
 

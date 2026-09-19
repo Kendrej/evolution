@@ -1,19 +1,23 @@
 use macroquad::prelude::*;
 use crate::agent::Agent;
+use crate::terrain::Terrain;
+
 pub struct World{
     agents: Vec<Agent>,
     food: Vec<Food>,
     height: f32,
     width: f32,
-    camera: Camera2D
+    camera: Camera2D,
+    terrain: Terrain
 }
 
 impl World{
     pub fn new_with_random_agents(num_agents: usize, num_food: usize) -> World{
         let mut agents = Vec::new();
         let mut food = Vec::new();
-        let height = 1500.0;
-        let width = 1500.0;
+        let terrain = Terrain::new(60, 60, 25.0);
+        let height = terrain.get_height();
+        let width = terrain.get_width();
         let cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, width, height));
 
         for _ in 0..num_agents{
@@ -29,7 +33,8 @@ impl World{
             food,
             height,
             width,
-            camera: cam
+            camera: cam,
+            terrain
         }
     }
 
@@ -56,6 +61,8 @@ impl World{
     pub fn draw(&self){
         set_camera(&self.camera);
 
+        self.terrain.draw();
+
         for a in &self.agents{
             a.draw();
         }
@@ -80,7 +87,7 @@ struct Food{
 
 impl Food{
     fn new_with_random_position(height: f32, width: f32) -> Food{
-        let size = 2.0;
+        let size = 5.0;
         let x = rand::gen_range(10.0, width - 10.0);
         let y = rand::gen_range(10.0, height - 10.0);
         Food{
@@ -92,6 +99,6 @@ impl Food{
     }
 
     fn draw(&self){
-        draw_circle(self.x, self.y, self.size, GREEN);
+        draw_circle(self.x, self.y, self.size, ORANGE);
     }
 }

@@ -54,7 +54,7 @@ impl Agent{
     }
 
     pub fn eat_food(&mut self, food_size: f32){
-        self.size += food_size * 1.0;
+        self.size += food_size * 0.5;
     }
 
 
