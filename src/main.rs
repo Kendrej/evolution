@@ -6,20 +6,17 @@ use agent::Agent;
 #[macroquad::main("Ewolucja")]
 async fn main() {
 
-    let mut agent =  Agent::new_with_position(10.0, 10.0, 5.0);
-    let mut agent1 = Agent::new_with_position(100.0, 50.0, 7.5);
-    let mut agent2 = Agent::new_with_position(20.0, 200.0, 10.0);
+    let mut agents =Vec::new();
 
-    let mut agents = vec![agent, agent1, agent2];
-
-    
-    
+    for _ in 0..5{
+        agents.push(Agent::new_with_random_position(screen_height(), screen_width(), 1.0));
+    }
 
 
     loop{
         
         clear_background(BLACK);
-
+        
         for a in &mut agents{
             a.update(screen_height(), screen_width());
             a.draw();
