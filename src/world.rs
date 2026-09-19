@@ -63,6 +63,11 @@ impl World{
         for f in &self.food{
             f.draw();
         }
+
+        set_default_camera();
+
+        draw_text(&format!("Agenci: {}", self.agents.len()), 10.0, 20.0, 20.0, WHITE);
+        draw_text(&format!("Jedzenie: {}", self.food.len()), 10.0, 40.0, 20.0, WHITE);
     }
 }
 
