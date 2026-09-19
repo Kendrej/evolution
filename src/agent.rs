@@ -9,14 +9,14 @@ pub struct Agent{
 }
 
 impl Agent{
-    pub fn new_with_random_position(height: f32, width: f32, speed: f32) -> Agent{
+    pub fn new_with_random_position(height: f32, width: f32) -> Agent{
         let x = rand::gen_range(0.0, width - 60.0);
         let y = rand::gen_range(0.0, height - 40.0);
         Agent{
             x,
             y,
             angle: 0.0,
-            speed,
+            speed: 1.0,
             color: BLUE
         }
     }

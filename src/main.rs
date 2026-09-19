@@ -1,26 +1,21 @@
 use macroquad::prelude::*;
+mod world;
 mod agent;
 
-use agent::Agent;
+use world::World;
 
 #[macroquad::main("Ewolucja")]
 async fn main() {
 
-    let mut agents =Vec::new();
-
-    for _ in 0..10{
-        agents.push(Agent::new_with_random_position(screen_height(), screen_width(), 1.0));
-    }
+    let mut world = World::new_with_random_agents(10);
 
 
     loop{
         
         clear_background(BLACK);
         
-        for a in &mut agents{
-            a.update(screen_height(), screen_width());
-            a.draw();
-        }
+        world.update();
+        world.draw();
 
         next_frame().await
     }
