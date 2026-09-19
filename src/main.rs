@@ -8,7 +8,7 @@ async fn main() {
 
     let mut agents =Vec::new();
 
-    for _ in 0..5{
+    for _ in 0..10{
         agents.push(Agent::new_with_random_position(screen_height(), screen_width(), 1.0));
     }
 
