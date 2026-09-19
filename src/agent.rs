@@ -12,8 +12,8 @@ pub struct Agent{
 impl Agent{
     pub fn new_with_random_position(height: f32, width: f32) -> Agent{
         let size = 10.0;
-        let x = rand::gen_range(0.0, width - size);
-        let y = rand::gen_range(0.0, height - size);
+        let x = rand::gen_range(size, width - size);
+        let y = rand::gen_range(size, height - size);
         Agent{
             x,
             y,
@@ -35,13 +35,13 @@ impl Agent{
         if new_x >= width - self.size {
             self.angle = PI - self.angle;
         }
-        else if new_x <= 0.0 {
+        else if new_x <= self.size {
             self.angle = PI - self.angle;
         }
         if new_y >= height - self.size {
             self.angle = -self.angle;
         }
-        else if new_y <= 0.0 {
+        else if new_y <= self.size {
             self.angle = -self.angle;
         }
         self.x += self.speed * self.angle.cos();
