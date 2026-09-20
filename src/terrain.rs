@@ -7,20 +7,18 @@ enum TileType{
     Water,
     Sand,
     Rock,
-    Base{
-        owner: usize
-    }
+    Base(u8)
 }
 
 impl TileType{
     fn get_color(&self) -> Color{
         match self{
-            TileType::Grass => Color::from_rgba(20, 100, 10, 255),
+            TileType::Grass => Color::from_rgba(62, 102, 62, 255),
             TileType::Water => Color::from_rgba(38, 56, 84, 255),
             TileType::Sand => Color::from_rgba(150, 134, 96, 255),
             TileType::Rock => Color::from_rgba(88, 88, 92, 255),
-            TileType::Base{owner} => {
-                match owner{
+            TileType::Base(tribe) => {
+                match tribe{
                     0 => Color::from_rgba(235, 75, 70, 255),
                     1 => Color::from_rgba(70, 200, 225, 255),
                     2 => Color::from_rgba(240, 200, 65, 255),
@@ -40,7 +38,7 @@ pub struct Terrain{
 }
 
 impl Terrain{
-    pub fn new(rows: usize, cols: usize, tile_size: f32) -> Terrain{
+    pub fn new(rows: usize, cols: usize, tile_size: f32, base_size: usize) -> Terrain{
         let mut tiles = Vec::new();
         for _ in 0..rows{
             let mut row = Vec::new();
@@ -51,11 +49,20 @@ impl Terrain{
             tiles.push(row);
         }
 
+        for i in 0..base_size{
+            for j in 0..base_size{
+                tiles[i][j] = TileType::Base(0);
+                tiles[i][cols - 1 - j] = TileType::Base(1);
+                tiles[rows - 1 - i][j] = TileType::Base(2);
+                tiles[rows - 1 - i][cols - 1 - j] = TileType::Base(3);
+            }
+        }
+
         Terrain{
             rows,
             cols,
             tile_size,
-            tiles
+            tiles,
         }
     }
 
