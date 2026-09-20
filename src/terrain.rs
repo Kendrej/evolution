@@ -135,6 +135,24 @@ impl Terrain{
         true
     }
 
+    pub fn is_walkable_at(&self, x: f32, y: f32) -> bool{
+        if x < 0.0 || x >= self.get_width() || y < 0.0 || y >= self.get_height(){
+            return false
+        }
+
+        let row = (y / self.tile_size) as usize;
+        let col = (x / self.tile_size) as usize;
+
+        self.tiles[row][col].is_walkable()
+    }
+
+    pub fn can_walk(&self, x: f32, y: f32, radius: f32) -> bool {
+        self.is_walkable_at(x - radius, y)
+        && self.is_walkable_at(x + radius, y)
+        && self.is_walkable_at(x, y - radius)
+        && self.is_walkable_at(x, y + radius)
+    }
+
     pub fn draw(&self){
         for row in 0..self.rows{
             for col in 0..self.cols{
@@ -154,5 +172,9 @@ impl Terrain{
 
     pub fn get_height(&self) -> f32{
         self.rows as f32 * self.tile_size
+    }
+
+    pub fn get_tile_size(&self) -> f32{
+        self.tile_size
     }
 }

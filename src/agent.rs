@@ -1,5 +1,6 @@
 use macroquad::prelude::*;
-use std::f32::consts::PI;
+use crate::terrain::Terrain;
+
 pub struct Agent{
     x: f32,
     y: f32,
@@ -26,35 +27,33 @@ impl Agent{
 
 
 
-    pub fn update(&mut self, height: f32, width: f32){
+    pub fn update(&mut self, terrain: &Terrain){
         self.angle += rand::gen_range(-0.1, 0.1);
-
+        
         let new_x = self.x + self.speed * self.angle.cos();
         let new_y = self.y + self.speed * self.angle.sin();
 
-        if new_x >= width - self.size {
-            self.angle = PI - self.angle;
+        if terrain.can_walk(new_x, self.y, self.size){
+            self.x = new_x;
         }
-        else if new_x <= self.size {
-            self.angle = PI - self.angle;
+        if terrain.can_walk(self.x, new_y, self.size){
+            self.y = new_y;
         }
-        if new_y >= height - self.size {
-            self.angle = -self.angle;
-        }
-        else if new_y <= self.size {
-            self.angle = -self.angle;
-        }
-        self.x += self.speed * self.angle.cos();
-        self.y += self.speed * self.angle.sin();
-
     }
 
     pub fn draw(&self){
         draw_circle(self.x, self.y, self.size, self.color)
     }
 
-    pub fn eat_food(&mut self, food_size: f32){
-        self.size += food_size * 0.5;
+    pub fn eat_food(&mut self, food_size: f32, tile_size: f32){
+        let new_size = self.size + food_size * 0.2;
+        
+        if new_size <= tile_size/2.0 {
+            self.size = new_size;
+        }
+        else {
+            self.size = tile_size/2.0;
+        }
     }
 
 

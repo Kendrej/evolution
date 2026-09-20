@@ -5,8 +5,6 @@ use crate::terrain::Terrain;
 pub struct World{
     agents: Vec<Agent>,
     food: Vec<Food>,
-    height: f32,
-    width: f32,
     camera: Camera2D,
     terrain: Terrain
 }
@@ -31,8 +29,6 @@ impl World{
         World{
             agents,
             food,
-            height,
-            width,
             camera: cam,
             terrain
         }
@@ -40,7 +36,7 @@ impl World{
 
     pub fn update(&mut self){
         for a in &mut self.agents{
-            a.update(self.height, self.width);
+            a.update(&self.terrain);
         }
 
         for a in &mut self.agents{
@@ -49,7 +45,7 @@ impl World{
                 let radius_sum = a.get_size() + f.size;
                 if distance_sq < radius_sum * radius_sum {
                     f.eaten = true;
-                    a.eat_food(f.size);
+                    a.eat_food(f.size, self.terrain.get_tile_size());
                 }
             }
         }
