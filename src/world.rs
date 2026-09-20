@@ -15,7 +15,7 @@ impl World{
     pub fn new_with_random_agents(num_agents: usize, num_food: usize) -> World{
         let mut agents = Vec::new();
         let mut food = Vec::new();
-        let terrain = Terrain::new(60, 60, 25.0, 5);
+        let terrain = Terrain::new(60, 60, 25.0, 5, 2);
         let height = terrain.get_height();
         let width = terrain.get_width();
         let cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, width, height));

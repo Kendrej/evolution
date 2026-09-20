@@ -1,5 +1,6 @@
 use macroquad::prelude::*;
-use noise::{NoiseFn, Perlin, Seedable, core::{perlin, value}};
+use noise::{NoiseFn, Perlin};
+use std::{collections::VecDeque, vec};
 
 #[derive(Clone, Copy, PartialEq)]
 
@@ -42,20 +43,28 @@ pub struct Terrain{
     rows: usize,
     cols: usize,
     tile_size: f32,
-    base_size: usize,
     tiles: Vec<Vec<TileType>>
 }
 
 impl Terrain{
-    pub fn new(rows: usize, cols: usize, tile_size: f32, base_size: usize) -> Terrain{
-
-        let tiles = Terrain::generate(rows, cols, base_size, 234234);
+    pub fn new(rows: usize, cols: usize, tile_size: f32, base_size: usize, seed: u32) -> Terrain{
+        let mut tiles = Vec::new();
+        let mut correct_map = false;
+        for attempt in 0..100{
+            tiles = Terrain::generate(rows, cols, base_size, seed + attempt);
+            if Terrain::validate_map(rows, cols, &tiles){
+                correct_map = true;
+                break
+            }
+        }
+        if !correct_map{
+            panic!("Nie udało się wygenerować poprawnej mapy po 100 próbach");
+        }
 
         Terrain{
             rows,
             cols,
             tile_size,
-            base_size,
             tiles
         }
     }
@@ -97,6 +106,33 @@ impl Terrain{
             }
         }
         tiles
+    }
+
+    fn validate_map(rows: usize, cols: usize, tiles: &Vec<Vec<TileType>>) -> bool{
+        let mut visited_tiles = vec![vec![false; cols]; rows];
+        let neighbors = [(-1, 0), (1, 0), (0, -1), (0, 1)];
+        let mut queue = VecDeque::new();
+        visited_tiles[0][0] = true;
+        queue.push_back((0usize, 0usize));
+
+        while let Some((row,col)) = queue.pop_front(){
+            for (dr, dc) in neighbors {
+                let new_row = row as i32 + dr;
+                let new_col = col as i32 + dc;
+                if new_row >= 0 && new_row < rows as i32 && new_col >= 0 && new_col < cols as i32 {
+                    let new_row = new_row as usize;
+                    let new_col = new_col as usize;
+                    if tiles[new_row][new_col].is_walkable() && !visited_tiles[new_row][new_col] {
+                        visited_tiles[new_row][new_col] = true;
+                        queue.push_back((new_row, new_col));
+                    }           
+                }
+            }
+        }
+        if !visited_tiles[0][cols - 1] || !visited_tiles[rows - 1][0] || !visited_tiles[rows - 1][cols - 1] {
+            return false
+        }
+        true
     }
 
     pub fn draw(&self){
