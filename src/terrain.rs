@@ -1,4 +1,5 @@
 use macroquad::prelude::*;
+use noise::{NoiseFn, Perlin, Seedable, core::{perlin, value}};
 
 #[derive(Clone, Copy, PartialEq)]
 
@@ -28,26 +29,64 @@ impl TileType{
             }
         }
     }
+
+    fn is_walkable(&self) -> bool{
+        match self{
+            TileType::Rock => false,
+            _ => true
+        }
+    }
 }
 
 pub struct Terrain{
     rows: usize,
     cols: usize,
     tile_size: f32,
+    base_size: usize,
     tiles: Vec<Vec<TileType>>
 }
 
 impl Terrain{
     pub fn new(rows: usize, cols: usize, tile_size: f32, base_size: usize) -> Terrain{
+
+        let tiles = Terrain::generate(rows, cols, base_size, 234234);
+
+        Terrain{
+            rows,
+            cols,
+            tile_size,
+            base_size,
+            tiles
+        }
+    }
+
+    fn generate(rows: usize, cols: usize, base_size: usize, seed: u32) -> Vec<Vec<TileType>>{
+        let perlin = Perlin::new(seed);
+
+        
         let mut tiles = Vec::new();
-        for _ in 0..rows{
+        for i in 0..rows{
             let mut row = Vec::new();
-            for _ in 0..cols{
-                let tile_type = TileType::Grass;
+            for j in 0..cols{
+                let value = perlin.get([j as f64 * 0.05, i as f64 * 0.05]);
+                let tile_type = if value < -0.3{
+                    TileType::Water
+                }
+                else if value < -0.15{
+                    TileType::Sand
+                }
+                else if value < 0.5{
+                    TileType::Grass
+                }
+                else{
+                    TileType::Rock
+                };
                 row.push(tile_type);
             }
             tiles.push(row);
         }
+
+
 
         for i in 0..base_size{
             for j in 0..base_size{
@@ -57,13 +96,7 @@ impl Terrain{
                 tiles[rows - 1 - i][cols - 1 - j] = TileType::Base(3);
             }
         }
-
-        Terrain{
-            rows,
-            cols,
-            tile_size,
-            tiles,
-        }
+        tiles
     }
 
     pub fn draw(&self){
