@@ -13,7 +13,7 @@ async fn main() {
 
     loop{
         
-        clear_background(BLACK);
+        clear_background(Color::from_rgba(20, 20, 24, 255));
         
         world.update();
         world.draw();

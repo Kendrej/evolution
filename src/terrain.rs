@@ -6,16 +6,28 @@ enum TileType{
     Grass,
     Water,
     Sand,
-    Rock
+    Rock,
+    Base{
+        owner: usize
+    }
 }
 
 impl TileType{
     fn get_color(&self) -> Color{
         match self{
-            TileType::Grass => GREEN,
-            TileType::Water => BLUE,
-            TileType::Sand => YELLOW,
-            TileType::Rock => GRAY
+            TileType::Grass => Color::from_rgba(20, 100, 10, 255),
+            TileType::Water => Color::from_rgba(38, 56, 84, 255),
+            TileType::Sand => Color::from_rgba(150, 134, 96, 255),
+            TileType::Rock => Color::from_rgba(88, 88, 92, 255),
+            TileType::Base{owner} => {
+                match owner{
+                    0 => Color::from_rgba(235, 75, 70, 255),
+                    1 => Color::from_rgba(70, 200, 225, 255),
+                    2 => Color::from_rgba(240, 200, 65, 255),
+                    3 => Color::from_rgba(205, 95, 200, 255),
+                    _ => Color::from_rgba(255, 255, 255, 255)
+                }
+            }
         }
     }
 }
