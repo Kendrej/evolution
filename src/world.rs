@@ -1,25 +1,29 @@
 use macroquad::prelude::*;
 use crate::agent::Agent;
 use crate::terrain::Terrain;
-
+use crate::tribe::Tribe;
 pub struct World{
     agents: Vec<Agent>,
     food: Vec<Food>,
     camera: Camera2D,
-    terrain: Terrain
+    terrain: Terrain,
+    tribes: Vec<Tribe>
 }
 
 impl World{
     pub fn new_with_random_agents(num_agents: usize, num_food: usize) -> World{
         let mut agents = Vec::new();
         let mut food = Vec::new();
-        let terrain = Terrain::new(60, 60, 25.0, 5, 2);
+        let rows = 60;
+        let cols = 60;
+        let terrain = Terrain::new(rows, cols, 25.0, 5, 2);
+        let tribes = Tribe::create_tribes(rows, cols);
         let height = terrain.get_height();
         let width = terrain.get_width();
-        let cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, width, height));
+        let cam: Camera2D = Camera2D::from_display_rect(Rect::new(0.0, 0.0, width, height));
 
-        for _ in 0..num_agents{
-            agents.push(Agent::new_with_random_position(height, width));
+        for i in 0..num_agents{
+            agents.push(Agent::new_with_random_position(height, width, i % 4));
         }
 
         for _ in 0..num_food{
@@ -30,7 +34,8 @@ impl World{
             agents,
             food,
             camera: cam,
-            terrain
+            terrain,
+            tribes
         }
     }
 
@@ -60,7 +65,7 @@ impl World{
         self.terrain.draw();
 
         for a in &self.agents{
-            a.draw();
+            a.draw(self.tribes[a.get_tribe()].get_color());
         }
 
         for f in &self.food{

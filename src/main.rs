@@ -2,13 +2,13 @@ use macroquad::prelude::*;
 mod world;
 mod agent;
 mod terrain;
-
+mod tribe;
 use world::World;
 
 #[macroquad::main("Ewolucja")]
 async fn main() {
 
-    let mut world = World::new_with_random_agents(10, 100);
+    let mut world = World::new_with_random_agents(40, 100);
 
 
     loop{

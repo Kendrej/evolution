@@ -1,17 +1,16 @@
 use macroquad::prelude::*;
 use crate::terrain::Terrain;
-
 pub struct Agent{
     x: f32,
     y: f32,
     angle: f32,
     speed: f32,
-    color: Color,
-    size: f32
+    size: f32,
+    tribe: usize
 }
 
 impl Agent{
-    pub fn new_with_random_position(height: f32, width: f32) -> Agent{
+    pub fn new_with_random_position(height: f32, width: f32, tribe: usize) -> Agent{
         let size = 10.0;
         let x = rand::gen_range(size, width - size);
         let y = rand::gen_range(size, height - size);
@@ -20,8 +19,8 @@ impl Agent{
             y,
             angle: 0.0,
             speed: 1.0,
-            color: BLUE,
-            size: size
+            size: size,
+            tribe
         }
     }
 
@@ -41,8 +40,8 @@ impl Agent{
         }
     }
 
-    pub fn draw(&self){
-        draw_circle(self.x, self.y, self.size, self.color)
+    pub fn draw(&self, color: Color){
+        draw_circle(self.x, self.y, self.size, color)
     }
 
     pub fn eat_food(&mut self, food_size: f32, tile_size: f32){
@@ -60,11 +59,16 @@ impl Agent{
     pub fn get_x(&self) -> f32{
         self.x
     }
+
     pub fn get_y(&self) -> f32{
         self.y
     }
+
     pub fn get_size(&self) -> f32{
         self.size
     }
     
+    pub fn get_tribe(&self) -> usize{
+        self.tribe
+    }
 }

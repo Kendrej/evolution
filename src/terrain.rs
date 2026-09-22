@@ -1,6 +1,7 @@
 use macroquad::prelude::*;
 use noise::{NoiseFn, Perlin};
 use std::{collections::VecDeque, vec};
+use crate::tribe::TRIBE_COLORS;
 
 #[derive(Clone, Copy, PartialEq)]
 
@@ -19,15 +20,7 @@ impl TileType{
             TileType::Water => Color::from_rgba(38, 56, 84, 255),
             TileType::Sand => Color::from_rgba(150, 134, 96, 255),
             TileType::Rock => Color::from_rgba(88, 88, 92, 255),
-            TileType::Base(tribe) => {
-                match tribe{
-                    0 => Color::from_rgba(235, 75, 70, 255),
-                    1 => Color::from_rgba(70, 200, 225, 255),
-                    2 => Color::from_rgba(240, 200, 65, 255),
-                    3 => Color::from_rgba(205, 95, 200, 255),
-                    _ => Color::from_rgba(255, 255, 255, 255)
-                }
-            }
+            TileType::Base(tribe) => mix(TRIBE_COLORS[*tribe as usize], Color::new(0.15, 0.15, 0.17, 1.0), 0.35)
         }
     }
 
@@ -177,4 +170,13 @@ impl Terrain{
     pub fn get_tile_size(&self) -> f32{
         self.tile_size
     }
+}
+
+fn mix(a: Color, b: Color, t: f32) -> Color {
+    Color::new(
+        a.r * t + b.r * (1.0 - t),
+        a.g * t + b.g * (1.0 - t),
+        a.b * t + b.b * (1.0 - t),
+        1.0,
+    )
 }
