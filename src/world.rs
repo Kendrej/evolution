@@ -20,8 +20,8 @@ impl World{
         let base_size = 5;
         let terrain = Terrain::new(rows, cols, tile_size, base_size, 200);
         let tribes = Tribe::create_tribes(rows, cols);
-        let height = terrain.get_height();
-        let width = terrain.get_width();
+        let height = terrain.height();
+        let width = terrain.width();
         let cam: Camera2D = Camera2D::from_display_rect(Rect::new(0.0, 0.0, width, height));
 
         for i in 0..num_agents{
@@ -52,7 +52,7 @@ impl World{
                 let radius_sum = a.get_size() + f.size;
                 if distance_sq < radius_sum * radius_sum {
                     f.eaten = true;
-                    a.eat_food(f.size, self.terrain.get_tile_size());
+                    a.eat_food(f.size, self.terrain.config().tile_size);
                 }
             }
         }

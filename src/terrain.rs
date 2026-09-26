@@ -145,7 +145,7 @@ impl Terrain{
     }
 
     pub fn is_walkable_at(&self, x: f32, y: f32) -> bool{
-        if x < 0.0 || x >= self.get_width() || y < 0.0 || y >= self.get_height(){
+        if x < 0.0 || x >= self.width() || y < 0.0 || y >= self.height(){
             return false
         }
 
@@ -175,16 +175,16 @@ impl Terrain{
         }
     }
 
-    pub fn get_width(&self) -> f32{
+    pub fn width(&self) -> f32{
         self.config.cols as f32 * self.config.tile_size
     }
 
-    pub fn get_height(&self) -> f32{
+    pub fn height(&self) -> f32{
         self.config.rows as f32 * self.config.tile_size
     }
-
-    pub fn get_tile_size(&self) -> f32{
-        self.config.tile_size
+    
+    pub fn config(&self) -> &TerrainConfig{
+        &self.config
     }
 }
 
