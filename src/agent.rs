@@ -68,7 +68,7 @@ impl Agent{
         self.size
     }
     
-    pub fn get_tribe(&self) -> usize{
+    pub fn tribe(&self) -> usize{
         self.tribe
     }
 }

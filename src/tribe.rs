@@ -30,7 +30,7 @@ impl Tribe {
         ]
     }
 
-    pub fn get_color(&self) -> Color {
+    pub fn color(&self) -> Color {
         self.color
     }
 }

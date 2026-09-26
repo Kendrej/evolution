@@ -32,20 +32,34 @@ impl TileType{
     }
 }
 
+pub struct TerrainConfig{
+    pub rows: usize,
+    pub cols: usize,
+    pub base_size: usize,
+    pub tile_size: f32,
+    pub seed: u32,
+}
+
 pub struct Terrain{
-    rows: usize,
-    cols: usize,
-    tile_size: f32,
+    config: TerrainConfig,
     tiles: Vec<Vec<TileType>>
 }
 
 impl Terrain{
     pub fn new(rows: usize, cols: usize, tile_size: f32, base_size: usize, seed: u32) -> Terrain{
+        let config = TerrainConfig {
+            rows,
+            cols,
+            tile_size,
+            base_size,
+            seed,
+        };
+        
         let mut tiles = Vec::new();
         let mut correct_map = false;
         for attempt in 0..100{
-            tiles = Terrain::generate(rows, cols, base_size, seed + attempt);
-            if Terrain::validate_map(rows, cols, &tiles){
+            tiles = Terrain::generate(&config, attempt);
+            if Terrain::validate_map(&config, &tiles){
                 correct_map = true;
                 break
             }
@@ -54,22 +68,22 @@ impl Terrain{
             panic!("Nie udało się wygenerować poprawnej mapy po 100 próbach");
         }
 
+        
+
         Terrain{
-            rows,
-            cols,
-            tile_size,
+            config,
             tiles
         }
     }
 
-    fn generate(rows: usize, cols: usize, base_size: usize, seed: u32) -> Vec<Vec<TileType>>{
-        let perlin = Perlin::new(seed);
+    fn generate(config: &TerrainConfig, attempt: u32) -> Vec<Vec<TileType>>{
+        let perlin = Perlin::new(config.seed + attempt);
 
         
         let mut tiles = Vec::new();
-        for i in 0..rows{
+        for i in 0..config.rows{
             let mut row = Vec::new();
-            for j in 0..cols{
+            for j in 0..config.cols{
                 let value = perlin.get([j as f64 * 0.05, i as f64 * 0.05]);
                 let tile_type = if value < -0.3{
                     TileType::Water
@@ -90,19 +104,19 @@ impl Terrain{
 
 
 
-        for i in 0..base_size{
-            for j in 0..base_size{
+        for i in 0..config.base_size{
+            for j in 0..config.base_size{
                 tiles[i][j] = TileType::Base(0);
-                tiles[i][cols - 1 - j] = TileType::Base(1);
-                tiles[rows - 1 - i][j] = TileType::Base(2);
-                tiles[rows - 1 - i][cols - 1 - j] = TileType::Base(3);
+                tiles[i][config.cols - 1 - j] = TileType::Base(1);
+                tiles[config.rows - 1 - i][j] = TileType::Base(2);
+                tiles[config.rows - 1 - i][config.cols - 1 - j] = TileType::Base(3);
             }
         }
         tiles
     }
 
-    fn validate_map(rows: usize, cols: usize, tiles: &Vec<Vec<TileType>>) -> bool{
-        let mut visited_tiles = vec![vec![false; cols]; rows];
+    fn validate_map(config: &TerrainConfig, tiles: &Vec<Vec<TileType>>) -> bool{
+        let mut visited_tiles = vec![vec![false; config.cols]; config.rows];
         let neighbors = [(-1, 0), (1, 0), (0, -1), (0, 1)];
         let mut queue = VecDeque::new();
         visited_tiles[0][0] = true;
@@ -112,7 +126,7 @@ impl Terrain{
             for (dr, dc) in neighbors {
                 let new_row = row as i32 + dr;
                 let new_col = col as i32 + dc;
-                if new_row >= 0 && new_row < rows as i32 && new_col >= 0 && new_col < cols as i32 {
+                if new_row >= 0 && new_row < config.rows as i32 && new_col >= 0 && new_col < config.cols as i32 {
                     let new_row = new_row as usize;
                     let new_col = new_col as usize;
                     if tiles[new_row][new_col].is_walkable() && !visited_tiles[new_row][new_col] {
@@ -122,7 +136,9 @@ impl Terrain{
                 }
             }
         }
-        if !visited_tiles[0][cols - 1] || !visited_tiles[rows - 1][0] || !visited_tiles[rows - 1][cols - 1] {
+        if !visited_tiles[0][config.cols - 1]
+            || !visited_tiles[config.rows - 1][0]
+            || !visited_tiles[config.rows - 1][config.cols - 1] {
             return false
         }
         true
@@ -133,8 +149,8 @@ impl Terrain{
             return false
         }
 
-        let row = (y / self.tile_size) as usize;
-        let col = (x / self.tile_size) as usize;
+        let row = (y / self.config.tile_size) as usize;
+        let col = (x / self.config.tile_size) as usize;
 
         self.tiles[row][col].is_walkable()
     }
@@ -147,28 +163,28 @@ impl Terrain{
     }
 
     pub fn draw(&self){
-        for row in 0..self.rows{
-            for col in 0..self.cols{
+        for row in 0..self.config.rows{
+            for col in 0..self.config.cols{
                 let tile_type = self.tiles[row][col];
                 let color = tile_type.get_color();
-                let x = col as f32 * self.tile_size;
-                let y = row as f32 * self.tile_size;
-                draw_rectangle(x, y, self.tile_size, self.tile_size, color);
-                draw_rectangle_lines(x, y, self.tile_size, self.tile_size, 1.0, BLACK);
+                let x = col as f32 * self.config.tile_size;
+                let y = row as f32 * self.config.tile_size;
+                draw_rectangle(x, y, self.config.tile_size, self.config.tile_size, color);
+                draw_rectangle_lines(x, y, self.config.tile_size, self.config.tile_size, 1.0, BLACK);
             }
         }
     }
 
     pub fn get_width(&self) -> f32{
-        self.cols as f32 * self.tile_size
+        self.config.cols as f32 * self.config.tile_size
     }
 
     pub fn get_height(&self) -> f32{
-        self.rows as f32 * self.tile_size
+        self.config.rows as f32 * self.config.tile_size
     }
 
     pub fn get_tile_size(&self) -> f32{
-        self.tile_size
+        self.config.tile_size
     }
 }
 

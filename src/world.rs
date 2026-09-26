@@ -16,7 +16,9 @@ impl World{
         let mut food = Vec::new();
         let rows = 60;
         let cols = 60;
-        let terrain = Terrain::new(rows, cols, 25.0, 5, 2);
+        let tile_size = 25.0;
+        let base_size = 5;
+        let terrain = Terrain::new(rows, cols, tile_size, base_size, 200);
         let tribes = Tribe::create_tribes(rows, cols);
         let height = terrain.get_height();
         let width = terrain.get_width();
@@ -65,7 +67,7 @@ impl World{
         self.terrain.draw();
 
         for a in &self.agents{
-            a.draw(self.tribes[a.get_tribe()].get_color());
+            a.draw(self.tribes[a.tribe()].color());
         }
 
         for f in &self.food{
