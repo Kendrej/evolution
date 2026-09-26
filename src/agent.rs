@@ -1,5 +1,7 @@
 use macroquad::prelude::*;
 use crate::terrain::Terrain;
+use macroquad::rand::gen_range;
+
 pub struct Agent{
     x: f32,
     y: f32,
@@ -10,16 +12,15 @@ pub struct Agent{
 }
 
 impl Agent{
-    pub fn new_with_random_position(height: f32, width: f32, tribe: usize) -> Agent{
-        let size = 10.0;
-        let x = rand::gen_range(size, width - size);
-        let y = rand::gen_range(size, height - size);
+    pub fn spawn_at_tile(tile: (usize, usize), tribe: usize, tile_size: f32) -> Agent{
+        let x = (tile.0 as f32 * tile_size) + tile_size/2.0;
+        let y = (tile.1 as f32 * tile_size) + tile_size/2.0;
         Agent{
             x,
             y,
-            angle: 0.0,
+            angle: gen_range(0.0, 360.0),
             speed: 1.0,
-            size: size,
+            size: tile_size * 0.4,
             tribe
         }
     }

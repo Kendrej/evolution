@@ -11,7 +11,7 @@ pub struct World{
 }
 
 impl World{
-    pub fn new_with_random_agents(num_agents: usize, num_food: usize) -> World{
+    pub fn new(num_agents: usize, num_food: usize) -> World{
         let mut agents = Vec::new();
         let mut food = Vec::new();
         let rows = 60;
@@ -19,13 +19,14 @@ impl World{
         let tile_size = 25.0;
         let base_size = 5;
         let terrain = Terrain::new(rows, cols, tile_size, base_size, 200);
-        let tribes = Tribe::create_tribes(rows, cols);
+        let tribes = Tribe::create_tribes(terrain.config());
         let height = terrain.height();
         let width = terrain.width();
         let cam: Camera2D = Camera2D::from_display_rect(Rect::new(0.0, 0.0, width, height));
 
         for i in 0..num_agents{
-            agents.push(Agent::new_with_random_position(height, width, i % 4));
+            let tribe = i % 4;
+            agents.push(Agent::spawn_at_tile(tribes[tribe].random_base_tile(), tribe, terrain.config().tile_size));
         }
 
         for _ in 0..num_food{

@@ -8,7 +8,7 @@ use world::World;
 #[macroquad::main("Ewolucja")]
 async fn main() {
 
-    let mut world = World::new_with_random_agents(40, 100);
+    let mut world = World::new(40, 100);
 
 
     loop{
