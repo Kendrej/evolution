@@ -188,7 +188,7 @@ impl Terrain{
     }
 }
 
-fn mix(a: Color, b: Color, t: f32) -> Color {
+pub fn mix(a: Color, b: Color, t: f32) -> Color {
     Color::new(
         a.r * t + b.r * (1.0 - t),
         a.g * t + b.g * (1.0 - t),

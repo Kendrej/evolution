@@ -1,14 +1,16 @@
 use macroquad::prelude::*;
 use crate::terrain::Terrain;
 use macroquad::rand::gen_range;
-
+use crate::terrain::mix;
 pub struct Agent{
     x: f32,
     y: f32,
     angle: f32,
     speed: f32,
     size: f32,
-    tribe: usize
+    tribe: usize,
+    energy: f32,
+    max_energy: f32
 }
 
 impl Agent{
@@ -21,7 +23,9 @@ impl Agent{
             angle: gen_range(0.0, 360.0),
             speed: 1.0,
             size: tile_size * 0.4,
-            tribe
+            tribe,
+            energy: 100.0,
+            max_energy: 100.0
         }
     }
 
@@ -39,10 +43,18 @@ impl Agent{
         if terrain.can_walk(self.x, new_y, self.size){
             self.y = new_y;
         }
+
+        self.energy -= 0.05;
+        if self.energy <= 0.0 {
+            self.energy = 0.0;
+            self.speed = 0.0;
+        }
     }
 
     pub fn draw(&self, color: Color){
-        draw_circle(self.x, self.y, self.size, color)
+        let energy_ratio = self.energy / self.max_energy;
+        let new_color = mix(color, GRAY, energy_ratio);
+        draw_circle(self.x, self.y, self.size, new_color)
     }
 
     pub fn eat_food(&mut self, food_size: f32, tile_size: f32){
@@ -53,6 +65,13 @@ impl Agent{
         }
         else {
             self.size = tile_size/2.0;
+        }
+
+        if self.energy + food_size * 5.0 <= self.max_energy {
+            self.energy += food_size * 5.0;
+        }
+        else {
+            self.energy = self.max_energy;
         }
     }
 

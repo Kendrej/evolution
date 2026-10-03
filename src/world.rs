@@ -44,10 +44,6 @@ impl World{
 
     pub fn update(&mut self){
         for a in &mut self.agents{
-            a.update(&self.terrain);
-        }
-
-        for a in &mut self.agents{
             for f in &mut self.food{
                 let distance_sq = (a.get_x() - f.x).powi(2) + (a.get_y() - f.y).powi(2);
                 let radius_sum = a.get_size() + f.size;
@@ -57,6 +53,12 @@ impl World{
                 }
             }
         }
+
+        for a in &mut self.agents{
+            a.update(&self.terrain);
+        }
+
+        
 
         self.food.retain(|f| !f.eaten);
 
