@@ -47,7 +47,7 @@ impl World{
             for f in &mut self.food{
                 let distance_sq = (a.get_x() - f.x).powi(2) + (a.get_y() - f.y).powi(2);
                 let radius_sum = a.get_size() + f.size;
-                if distance_sq < radius_sum * radius_sum {
+                if (distance_sq < radius_sum * radius_sum) && (a.is_alive()) && (!f.eaten){
                     f.eaten = true;
                     a.eat_food(f.size, self.terrain.config().tile_size);
                 }
@@ -58,10 +58,8 @@ impl World{
             a.update(&self.terrain);
         }
 
-        
-
         self.food.retain(|f| !f.eaten);
-
+        self.agents.retain(|a| !a.is_gone());
     }
 
     pub fn draw(&self){
