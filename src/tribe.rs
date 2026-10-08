@@ -37,8 +37,8 @@ impl Tribe {
     pub fn create_tribes(config: &TerrainConfig) -> Vec<Tribe> {
         vec![
             Tribe::new(TRIBE_COLORS[0], (0, 0), config),
-            Tribe::new(TRIBE_COLORS[1], (0, config.cols - 1), config),
-            Tribe::new(TRIBE_COLORS[2], (config.rows - 1, 0), config),
+            Tribe::new(TRIBE_COLORS[1], (config.cols - 1, 0), config),
+            Tribe::new(TRIBE_COLORS[2], (0, config.rows - 1), config),
             Tribe::new(TRIBE_COLORS[3], (config.rows - 1, config.cols - 1), config)
         ]
     }

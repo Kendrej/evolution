@@ -3,6 +3,9 @@ use noise::{NoiseFn, Perlin};
 use std::{collections::VecDeque, vec};
 use crate::tribe::TRIBE_COLORS;
 
+const CAPTURE_TIME_NEUTRAL: f32 = 60.0;
+const CAPTURE_TIME_ENEMY: f32 = 180.0;
+
 #[derive(Clone, Copy, PartialEq)]
 
 enum TileType{
@@ -12,6 +15,8 @@ enum TileType{
     Rock,
     Base(u8)
 }
+
+
 
 impl TileType{
     fn get_color(&self) -> Color{
@@ -32,6 +37,30 @@ impl TileType{
     }
 }
 
+struct Tile{
+    tile_type: TileType,
+    owner: Option<usize>,
+    capturer: Option<usize>,
+    capture_progress: f32,
+    capturer_present: bool
+}
+
+impl Tile{
+    fn new(tile_type: TileType, owner: Option<usize>, capturer: Option<usize>) -> Tile{
+        Tile{
+            tile_type,
+            owner,
+            capturer,
+            capture_progress: 0.0,
+            capturer_present: false
+        }
+    }
+
+    fn is_walkable(&self) -> bool{
+        self.tile_type.is_walkable()
+    }
+}
+
 pub struct TerrainConfig{
     pub rows: usize,
     pub cols: usize,
@@ -42,7 +71,7 @@ pub struct TerrainConfig{
 
 pub struct Terrain{
     config: TerrainConfig,
-    tiles: Vec<Vec<TileType>>
+    tiles: Vec<Vec<Tile>>
 }
 
 impl Terrain{
@@ -76,11 +105,11 @@ impl Terrain{
         }
     }
 
-    fn generate(config: &TerrainConfig, attempt: u32) -> Vec<Vec<TileType>>{
+    fn generate(config: &TerrainConfig, attempt: u32) -> Vec<Vec<Tile>>{
         let perlin = Perlin::new(config.seed + attempt);
 
         
-        let mut tiles = Vec::new();
+        let mut tiles= Vec::new();
         for i in 0..config.rows{
             let mut row = Vec::new();
             for j in 0..config.cols{
@@ -97,7 +126,8 @@ impl Terrain{
                 else{
                     TileType::Rock
                 };
-                row.push(tile_type);
+                let tile = Tile::new(tile_type, None, None);
+                row.push(tile);
             }
             tiles.push(row);
         }
@@ -106,16 +136,20 @@ impl Terrain{
 
         for i in 0..config.base_size{
             for j in 0..config.base_size{
-                tiles[i][j] = TileType::Base(0);
-                tiles[i][config.cols - 1 - j] = TileType::Base(1);
-                tiles[config.rows - 1 - i][j] = TileType::Base(2);
-                tiles[config.rows - 1 - i][config.cols - 1 - j] = TileType::Base(3);
+                tiles[i][j].tile_type = TileType::Base(0);
+                tiles[i][j].owner = Some(0);
+                tiles[i][config.cols - 1 - j].tile_type = TileType::Base(1);
+                tiles[i][config.cols - 1 - j].owner = Some(1);
+                tiles[config.rows - 1 - i][j].tile_type = TileType::Base(2);
+                tiles[config.rows - 1 - i][j].owner = Some(2);
+                tiles[config.rows - 1 - i][config.cols - 1 - j].tile_type = TileType::Base(3);
+                tiles[config.rows - 1 - i][config.cols - 1 - j].owner = Some(3);
             }
         }
         tiles
     }
 
-    fn validate_map(config: &TerrainConfig, tiles: &Vec<Vec<TileType>>) -> bool{
+    fn validate_map(config: &TerrainConfig, tiles: &Vec<Vec<Tile>>) -> bool{
         let mut visited_tiles = vec![vec![false; config.cols]; config.rows];
         let neighbors = [(-1, 0), (1, 0), (0, -1), (0, 1)];
         let mut queue = VecDeque::new();
@@ -162,15 +196,67 @@ impl Terrain{
         && self.is_walkable_at(x, y + radius)
     }
 
+    pub fn capture(&mut self, x: f32, y: f32, tribe: usize) {
+        let row = (y / self.config.tile_size) as usize;
+        let col = (x / self.config.tile_size) as usize;
+
+        let tile = &mut self.tiles[row][col];
+        if matches!(tile.tile_type, TileType::Base(_)){
+            return;
+        }
+
+        if tile.owner == Some(tribe) {
+            return;
+        }
+
+        if tile.capturer == Some(tribe) {
+            tile.capture_progress += 1.0;
+        } else {
+            tile.capturer = Some(tribe);
+            tile.capture_progress = 0.0;
+        }
+        tile.capturer_present = true;
+
+        let required = if tile.owner.is_none() {
+            CAPTURE_TIME_NEUTRAL
+        } else {
+            CAPTURE_TIME_ENEMY
+        };
+
+        if tile.capture_progress >= required {
+            tile.owner = Some(tribe);
+            tile.capturer = None;
+            tile.capture_progress = 0.0;
+        }
+    }
+
     pub fn draw(&self){
         for row in 0..self.config.rows{
             for col in 0..self.config.cols{
-                let tile_type = self.tiles[row][col];
-                let color = tile_type.get_color();
+                let tile_type = self.tiles[row][col].tile_type;
+                let mut color = tile_type.get_color();  
+
+                if let Some(t) = self.tiles[row][col].owner {
+                    let c = TRIBE_COLORS[t];  
+                    color = mix(c, color, 0.4);
+                }   
+    
                 let x = col as f32 * self.config.tile_size;
                 let y = row as f32 * self.config.tile_size;
                 draw_rectangle(x, y, self.config.tile_size, self.config.tile_size, color);
-                draw_rectangle_lines(x, y, self.config.tile_size, self.config.tile_size, 1.0, BLACK);
+                draw_rectangle_lines(x, y, self.config.tile_size, self.config.tile_size, 1.0, BLACK);             
+            }
+        }
+    }
+
+    pub fn update_capture_status(&mut self) {
+        for row in &mut self.tiles {
+            for tile in row {
+                if !tile.capturer_present {
+                    tile.capturer = None;
+                    tile.capture_progress = 0.0;
+                }
+                tile.capturer_present = false; 
             }
         }
     }

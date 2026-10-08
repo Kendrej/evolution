@@ -56,7 +56,11 @@ impl World{
 
         for a in &mut self.agents{
             a.update(&self.terrain);
+            if a.is_alive(){
+                self.terrain.capture(a.get_x(), a.get_y(), a.tribe());
+            }
         }
+        self.terrain.update_capture_status();
 
         self.food.retain(|f| !f.eaten);
         self.agents.retain(|a| !a.is_gone());
