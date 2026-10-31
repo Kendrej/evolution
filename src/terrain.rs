@@ -200,6 +200,13 @@ impl Terrain{
         !matches!(self.tiles[row][col].tile_type, TileType::Base(_))
     }
 
+    pub fn is_base_of(&self, x: f32, y: f32, tribe: usize) -> bool{
+        let row = (y / self.config.tile_size) as usize;
+        let col = (x / self.config.tile_size) as usize;
+
+        matches!(self.tiles[row][col].tile_type, TileType::Base(t) if t as usize == tribe)
+    }
+
     pub fn owner_at(&self, x: f32, y: f32) -> Option<usize>{
         let row = (y / self.config.tile_size) as usize;
         let col = (x / self.config.tile_size) as usize;

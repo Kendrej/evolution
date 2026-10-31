@@ -13,16 +13,18 @@ pub struct Agent{
     energy: f32,
     max_energy: f32,
     alive: bool,
-    timer_of_death: i32
+    timer_of_death: i32,
+    reproduction_cooldown: i32
 }
 
 const TIME_OF_DYING: i32 = 500;
 const TIME_OF_DISAPPEARING: f32 = 300.0;
+const REPRODUCTION_MIN_ENERGY: f32 = 60.0;
+const REPRODUCTION_COST: f32 = 25.0;
+const REPRODUCTION_COOLDOWN: i32 = 600;
 
 impl Agent{
-    pub fn spawn_at_tile(tile: (usize, usize), tribe: usize, tile_size: f32) -> Agent{
-        let x = (tile.0 as f32 * tile_size) + tile_size/2.0;
-        let y = (tile.1 as f32 * tile_size) + tile_size/2.0;
+    fn new(x: f32, y: f32, tribe: usize, energy: f32, tile_size: f32) -> Agent{
         Agent{
             x,
             y,
@@ -30,11 +32,44 @@ impl Agent{
             speed: 1.0,
             size: tile_size * 0.4,
             tribe,
-            energy: 100.0,
+            energy,
             max_energy: 100.0,
             alive: true,
-            timer_of_death: 0
+            timer_of_death: 0,
+            reproduction_cooldown: REPRODUCTION_COOLDOWN
         }
+    }
+
+    pub fn spawn_at_tile(tile: (usize, usize), tribe: usize, tile_size: f32) -> Agent{
+        let x = (tile.0 as f32 * tile_size) + tile_size/2.0;
+        let y = (tile.1 as f32 * tile_size) + tile_size/2.0;
+        Agent::new(x, y, tribe, 100.0, tile_size)
+    }
+
+    fn is_ready_to_reproduce(&self) -> bool{
+        self.alive && self.energy >= REPRODUCTION_MIN_ENERGY && self.reproduction_cooldown == 0
+    }
+
+    pub fn can_reproduce_with(&self, other: &Agent, terrain: &Terrain) -> bool{
+        if self.tribe != other.tribe || !self.is_ready_to_reproduce() || !other.is_ready_to_reproduce(){
+            return false
+        }
+
+        if !terrain.is_base_of(self.x, self.y, self.tribe) || !terrain.is_base_of(other.x, other.y, other.tribe){
+            return false
+        }
+
+        let distance_sq = (self.x - other.x).powi(2) + (self.y - other.y).powi(2);
+        let radius_sum = self.size + other.size;
+        distance_sq < radius_sum * radius_sum
+    }
+
+    pub fn reproduce_with(&mut self, other: &mut Agent, tile_size: f32) -> Agent{
+        self.energy -= REPRODUCTION_COST;
+        other.energy -= REPRODUCTION_COST;
+        self.reproduction_cooldown = REPRODUCTION_COOLDOWN;
+        other.reproduction_cooldown = REPRODUCTION_COOLDOWN;
+        Agent::new(self.x, self.y, self.tribe, REPRODUCTION_COST * 2.0, tile_size)
     }
 
 
@@ -51,6 +86,10 @@ impl Agent{
             }
             if terrain.can_walk(self.x, new_y, self.size){
                 self.y = new_y;
+            }
+
+            if self.reproduction_cooldown > 0 {
+                self.reproduction_cooldown -= 1;
             }
 
             self.energy -= 0.05;

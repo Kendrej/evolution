@@ -6,6 +6,7 @@ use crate::tribe::Tribe;
 const FOOD_SPAWN_ATTEMPTS: usize = 3;
 const FOOD_CHANCE_NEUTRAL: f32 = 0.05;
 const FOOD_CHANCE_OWNED: f32 = 0.15;
+const MAX_AGENTS: usize = 300;
 
 pub struct World{
     agents: Vec<Agent>,
@@ -76,7 +77,29 @@ impl World{
         self.food.retain(|f| !f.eaten);
         self.agents.retain(|a| !a.is_gone());
 
+        self.reproduce_agents();
         self.spawn_food();
+    }
+
+    fn reproduce_agents(&mut self){
+        let tile_size = self.terrain.config().tile_size;
+        let agents_count = self.agents.len();
+        let mut children = Vec::new();
+
+        for j in 1..agents_count{
+            let (left, right) = self.agents.split_at_mut(j);
+            let b = &mut right[0];
+            for a in left{
+                if agents_count + children.len() >= MAX_AGENTS{
+                    break;
+                }
+                if a.can_reproduce_with(b, &self.terrain){
+                    children.push(a.reproduce_with(b, tile_size));
+                }
+            }
+        }
+
+        self.agents.extend(children);
     }
 
     fn spawn_food(&mut self){
