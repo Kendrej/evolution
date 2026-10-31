@@ -9,6 +9,7 @@ const FOOD_CHANCE_NEUTRAL: f32 = 0.05;
 const FOOD_CHANCE_OWNED: f32 = 0.15;
 const MAX_AGENTS: usize = 300;
 const MIN_TRIBE_POPULATION: usize = 5;
+const SIMULATION_SPEEDS: [usize; 3] = [1, 10, 50];
 const STATS_BUTTON_WIDTH: f32 = 130.0;
 const STATS_BUTTON_HEIGHT: f32 = 25.0;
 
@@ -19,7 +20,8 @@ pub struct World{
     terrain: Terrain,
     tribes: Vec<Tribe>,
     stats: Stats,
-    stats_open: bool
+    stats_open: bool,
+    speed_index: usize
 }
 
 impl World{
@@ -58,13 +60,24 @@ impl World{
             terrain,
             tribes,
             stats,
-            stats_open: false
+            stats_open: false,
+            speed_index: 0
         }
     }
 
-    pub fn update(&mut self){
+    pub fn handle_input(&mut self){
         self.toggle_stats_on_click();
 
+        if is_key_pressed(KeyCode::Space){
+            self.speed_index = (self.speed_index + 1) % SIMULATION_SPEEDS.len();
+        }
+    }
+
+    pub fn steps_per_frame(&self) -> usize{
+        SIMULATION_SPEEDS[self.speed_index]
+    }
+
+    pub fn update(&mut self){
         for a in &mut self.agents{
             for f in &mut self.food{
                 let distance_sq = (a.get_x() - f.x).powi(2) + (a.get_y() - f.y).powi(2);
@@ -111,6 +124,9 @@ impl World{
         let label = if self.stats_open { "Statystyki -" } else { "Statystyki +" };
         draw_rectangle(0.0, 0.0, STATS_BUTTON_WIDTH, STATS_BUTTON_HEIGHT, panel_color);
         draw_text(label, 10.0, 18.0, 20.0, WHITE);
+
+        draw_rectangle(STATS_BUTTON_WIDTH, 0.0, 60.0, STATS_BUTTON_HEIGHT, panel_color);
+        draw_text(&format!("x{}", self.steps_per_frame()), STATS_BUTTON_WIDTH + 10.0, 18.0, 20.0, WHITE);
 
         if !self.stats_open{
             return;

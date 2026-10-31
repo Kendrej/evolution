@@ -28,7 +28,10 @@ async fn main() {
 
         clear_background(Color::from_rgba(20, 20, 24, 255));
 
-        world.update();
+        world.handle_input();
+        for _ in 0..world.steps_per_frame(){
+            world.update();
+        }
         world.draw();
 
         next_frame().await
