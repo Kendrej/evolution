@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 use crate::terrain::Terrain;
-use crate::brain::Brain;
+use crate::brain::{Brain, Senses};
 use macroquad::rand::gen_range;
 use crate::terrain::mix;
 use std::f32::consts::TAU;
@@ -8,7 +8,6 @@ pub struct Agent{
     x: f32,
     y: f32,
     angle: f32,
-    speed: f32,
     size: f32,
     tribe: usize,
     energy: f32,
@@ -32,7 +31,6 @@ impl Agent{
             x,
             y,
             angle: gen_range(0.0, TAU),
-            speed: 1.0,
             size: tile_size * 0.4,
             tribe,
             energy,
@@ -51,7 +49,7 @@ impl Agent{
         Agent::new(x, y, tribe, 100.0, tile_size)
     }
 
-    fn is_ready_to_reproduce(&self) -> bool{
+    pub fn is_ready_to_reproduce(&self) -> bool{
         self.alive && self.energy >= REPRODUCTION_MIN_ENERGY && self.reproduction_cooldown == 0
     }
 
@@ -79,13 +77,13 @@ impl Agent{
 
 
 
-    pub fn update(&mut self, terrain: &Terrain){
+    pub fn update(&mut self, terrain: &Terrain, senses: &Senses){
         if self.alive{
-            let action = self.brain.decide();
+            let action = self.brain.decide(senses);
             self.angle += action.turn;
         
-            let new_x = self.x + self.speed * self.angle.cos();
-            let new_y = self.y + self.speed * self.angle.sin();
+            let new_x = self.x + action.speed * self.angle.cos();
+            let new_y = self.y + action.speed * self.angle.sin();
 
             if terrain.can_walk(new_x, self.y, self.size){
                 self.x = new_x;
@@ -103,7 +101,6 @@ impl Agent{
             self.energy -= 0.05;
             if self.energy <= 0.0 {
                 self.energy = 0.0;
-                self.speed = 0.0;
                 self.timer_of_death += 1;
                 self.alive = false;
             }
@@ -170,6 +167,14 @@ impl Agent{
 
     pub fn is_gone(&self) -> bool{
         self.size == 0.0 && !self.alive
+    }
+
+    pub fn angle(&self) -> f32{
+        self.angle
+    }
+
+    pub fn energy_ratio(&self) -> f32{
+        self.energy / self.max_energy
     }
 
     pub fn age(&self) -> u32{

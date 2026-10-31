@@ -47,6 +47,12 @@ impl Tribe {
         self.color
     }
 
+    pub fn base_center(&self, tile_size: f32) -> (f32, f32) {
+        let x = (self.base_min.0 + self.base_max.0 + 1) as f32 * tile_size / 2.0;
+        let y = (self.base_min.1 + self.base_max.1 + 1) as f32 * tile_size / 2.0;
+        (x, y)
+    }
+
     pub fn random_base_tile(&self) -> (usize, usize) {
         let x = gen_range(self.base_min.0, self.base_max.0 + 1);
         let y = gen_range(self.base_min.1, self.base_max.1 + 1);

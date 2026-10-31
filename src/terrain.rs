@@ -59,6 +59,14 @@ impl Tile{
     fn is_walkable(&self) -> bool{
         self.tile_type.is_walkable()
     }
+
+    fn capture_time(&self) -> f32{
+        if self.owner.is_none() {
+            CAPTURE_TIME_NEUTRAL
+        } else {
+            CAPTURE_TIME_ENEMY
+        }
+    }
 }
 
 pub struct TerrainConfig{
@@ -207,6 +215,31 @@ impl Terrain{
         matches!(self.tiles[row][col].tile_type, TileType::Base(t) if t as usize == tribe)
     }
 
+    // Pole widziane przez agenta: wlasne 1, neutralne 0, wroga -0.5, nie do przejscia -1
+    pub fn tile_sense(&self, x: f32, y: f32, tribe: usize) -> f32{
+        if !self.is_walkable_at(x, y){
+            return -1.0
+        }
+
+        match self.owner_at(x, y){
+            Some(owner) if owner == tribe => 1.0,
+            Some(_) => -0.5,
+            None => 0.0
+        }
+    }
+
+    pub fn capture_progress_at(&self, x: f32, y: f32, tribe: usize) -> f32{
+        let row = (y / self.config.tile_size) as usize;
+        let col = (x / self.config.tile_size) as usize;
+
+        let tile = &self.tiles[row][col];
+        if tile.capturer == Some(tribe) {
+            tile.capture_progress / tile.capture_time()
+        } else {
+            0.0
+        }
+    }
+
     pub fn owned_tiles(&self, tribe: usize) -> usize{
         self.tiles.iter().flatten().filter(|tile| tile.owner == Some(tribe)).count()
     }
@@ -246,13 +279,7 @@ impl Terrain{
         }
         tile.capturer_present = true;
 
-        let required = if tile.owner.is_none() {
-            CAPTURE_TIME_NEUTRAL
-        } else {
-            CAPTURE_TIME_ENEMY
-        };
-
-        if tile.capture_progress >= required {
+        if tile.capture_progress >= tile.capture_time() {
             tile.owner = Some(tribe);
             tile.capturer = None;
             tile.capture_progress = 0.0;
@@ -300,6 +327,47 @@ impl Terrain{
     
     pub fn config(&self) -> &TerrainConfig{
         &self.config
+    }
+}
+
+#[cfg(test)]
+mod tests{
+    use super::*;
+
+    fn flat_terrain() -> Terrain{
+        let mut terrain = Terrain::new(10, 10, 25.0, 2, 1);
+        for row in &mut terrain.tiles{
+            for tile in row{
+                tile.tile_type = TileType::Grass;
+                tile.owner = None;
+            }
+        }
+        terrain
+    }
+
+    #[test]
+    fn tile_sense_tells_tiles_apart(){
+        let mut terrain = flat_terrain();
+        terrain.tiles[1][0].owner = Some(0);
+        terrain.tiles[1][1].owner = Some(1);
+        terrain.tiles[1][2].tile_type = TileType::Rock;
+
+        assert_eq!(terrain.tile_sense(12.0, 37.0, 0), 1.0);
+        assert_eq!(terrain.tile_sense(37.0, 37.0, 0), -0.5);
+        assert_eq!(terrain.tile_sense(62.0, 37.0, 0), -1.0);
+        assert_eq!(terrain.tile_sense(87.0, 37.0, 0), 0.0);
+        assert_eq!(terrain.tile_sense(-5.0, 37.0, 0), -1.0);
+    }
+
+    #[test]
+    fn capture_progress_is_a_fraction_for_the_capturer_only(){
+        let mut terrain = flat_terrain();
+        for _ in 0..31{
+            terrain.capture(12.0, 12.0, 0);
+        }
+
+        assert_eq!(terrain.capture_progress_at(12.0, 12.0, 0), 0.5);
+        assert_eq!(terrain.capture_progress_at(12.0, 12.0, 1), 0.0);
     }
 }
 

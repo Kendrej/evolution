@@ -20,13 +20,13 @@ Symulacja plemion w Ruście (macroquad). Celem jest neuroewolucja: każdy agent 
 - Pomiary zapisują się co 1000 kroków do plików CSV w `runs/`, poza repozytorium.
 
 ## Stan projektu
-Zrobione: statystyki i zapis do CSV, losowa mapa, minimalna populacja plemienia, przyspieszenie, struktura `Brain` i `Action`.
+Zrobione: statystyki i zapis do CSV, losowa mapa, minimalna populacja plemienia, przyspieszenie, struktura `Brain` i `Action`, zmysły agenta `Senses`.
 
-`Brain` to na razie tylko miejsce na sieć: `decide` losuje skręt, nie ma wag ani zmysłów. Nie sprawdzono jeszcze na danych, czy wydzielenie `Brain` nie zmieniło zachowania agentów.
+`Brain` to na razie tylko miejsce na sieć: dostaje zmysły, ale ich nie używa, a `decide` losuje skręt i zwraca stałą prędkość. Nie sprawdzono jeszcze na danych, czy wydzielenie `Brain` i zmysły nie zmieniły zachowania agentów.
 
 ## Następne kroki
-1. Zmysły agenta: energia, gotowość do rozmnażania oraz kierunek i odległość do bazy i najbliższego jedzenia, które może zjeść.
-2. Wykresy z plików CSV, żeby efekt sieci był widoczny od pierwszego przebiegu.
-3. Sieć neuronowa zamiast losowego skrętu, na początku z losowymi wagami i bez dziedziczenia.
-4. Dziedziczenie wag z mutacją oraz zapis i wczytywanie wag.
-5. Koszt energii za ruch i strojenie. Dobry znak to rosnące narodziny przy spadających odrodzeniach.
+1. Wykresy z plików CSV, żeby efekt sieci był widoczny od pierwszego przebiegu.
+2. Sieć neuronowa zamiast losowego skrętu i stałej prędkości, na początku z losowymi wagami i bez dziedziczenia.
+3. Dziedziczenie wag z mutacją oraz zapis i wczytywanie wag.
+4. Koszt energii za ruch i strojenie. Dobry znak to rosnące narodziny przy spadających odrodzeniach.
+5. Sprawdzenie, czy agenci sami przejmują pola (`owned_tiles` w CSV). Jeśli nie, rozważyć małą premię energii za przejęcie.

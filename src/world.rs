@@ -3,6 +3,8 @@ use crate::agent::Agent;
 use crate::terrain::Terrain;
 use crate::tribe::Tribe;
 use crate::stats::Stats;
+use crate::brain::{Senses, relative_direction};
+use std::f32::consts::FRAC_PI_2;
 
 const FOOD_SPAWN_ATTEMPTS: usize = 3;
 const FOOD_CHANCE_NEUTRAL: f32 = 0.05;
@@ -93,7 +95,8 @@ impl World{
 
         for a in &mut self.agents{
             let was_alive = a.is_alive();
-            a.update(&self.terrain);
+            let senses = sense(a, &self.terrain, &self.tribes[a.tribe()], &self.food);
+            a.update(&self.terrain, &senses);
             if a.is_alive(){
                 self.terrain.capture(a.get_x(), a.get_y(), a.tribe());
             }
@@ -225,6 +228,49 @@ impl World{
         set_default_camera();
 
         self.draw_stats();
+    }
+}
+
+fn sense(agent: &Agent, terrain: &Terrain, tribe: &Tribe, food: &[Food]) -> Senses{
+    let (x, y) = (agent.get_x(), agent.get_y());
+    let angle = agent.angle();
+    let tribe_id = agent.tribe();
+    let tile_size = terrain.config().tile_size;
+    let max_distance = (terrain.width().powi(2) + terrain.height().powi(2)).sqrt();
+
+    let (base_x, base_y) = tribe.base_center(tile_size);
+    let base_distance = ((base_x - x).powi(2) + (base_y - y).powi(2)).sqrt();
+
+    let mut nearest_food = None;
+    let mut nearest_distance_sq = f32::MAX;
+    for f in food{
+        let distance_sq = (f.x - x).powi(2) + (f.y - y).powi(2);
+        if distance_sq < nearest_distance_sq && !f.eaten
+            && terrain.owner_at(f.x, f.y).is_none_or(|owner| owner == tribe_id){
+            nearest_distance_sq = distance_sq;
+            nearest_food = Some(f);
+        }
+    }
+
+    let (food_direction, food_distance) = match nearest_food{
+        Some(f) => (relative_direction(x, y, angle, f.x, f.y), nearest_distance_sq.sqrt() / max_distance),
+        None => (0.0, 1.0)
+    };
+
+    let tile_at_angle = |a: f32| terrain.tile_sense(x + tile_size * a.cos(), y + tile_size * a.sin(), tribe_id);
+
+    Senses{
+        energy: agent.energy_ratio(),
+        ready_to_reproduce: if agent.is_ready_to_reproduce() { 1.0 } else { 0.0 },
+        base_direction: relative_direction(x, y, angle, base_x, base_y),
+        base_distance: base_distance / max_distance,
+        food_direction,
+        food_distance,
+        tile_here: terrain.tile_sense(x, y, tribe_id),
+        capture_progress: terrain.capture_progress_at(x, y, tribe_id),
+        tile_ahead: tile_at_angle(angle),
+        tile_left: tile_at_angle(angle - FRAC_PI_2),
+        tile_right: tile_at_angle(angle + FRAC_PI_2)
     }
 }
 
