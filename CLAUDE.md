@@ -18,15 +18,15 @@ Symulacja plemion w Ruście (macroquad). Celem jest neuroewolucja: każdy agent 
 - `cargo run --release` do dłuższych przebiegów. Spacja zmienia prędkość symulacji (x1, x10, x50).
 - Ziarno jest losowe. Żeby powtórzyć przebieg, ustaw `FIXED_SEED` w `src/main.rs`.
 - Pomiary zapisują się co 1000 kroków do plików CSV w `runs/`, poza repozytorium.
+- `python tools/plot_run.py` rysuje wykresy najnowszego przebiegu i zapisuje PNG obok pliku CSV. Wymaga `matplotlib`.
 
 ## Stan projektu
-Zrobione: statystyki i zapis do CSV, losowa mapa, minimalna populacja plemienia, przyspieszenie, struktura `Brain` i `Action`, zmysły agenta `Senses`.
+Zrobione: statystyki i zapis do CSV, losowa mapa, minimalna populacja plemienia, przyspieszenie, struktura `Brain` i `Action`, zmysły agenta `Senses`, wykresy z plików CSV.
 
 `Brain` to na razie tylko miejsce na sieć: dostaje zmysły, ale ich nie używa, a `decide` losuje skręt i zwraca stałą prędkość. Nie sprawdzono jeszcze na danych, czy wydzielenie `Brain` i zmysły nie zmieniły zachowania agentów.
 
 ## Następne kroki
-1. Wykresy z plików CSV, żeby efekt sieci był widoczny od pierwszego przebiegu.
-2. Sieć neuronowa zamiast losowego skrętu i stałej prędkości, na początku z losowymi wagami i bez dziedziczenia.
-3. Dziedziczenie wag z mutacją oraz zapis i wczytywanie wag.
-4. Koszt energii za ruch i strojenie. Dobry znak to rosnące narodziny przy spadających odrodzeniach.
-5. Sprawdzenie, czy agenci sami przejmują pola (`owned_tiles` w CSV). Jeśli nie, rozważyć małą premię energii za przejęcie.
+1. Sieć neuronowa zamiast losowego skrętu i stałej prędkości, na początku z losowymi wagami i bez dziedziczenia.
+2. Dziedziczenie wag z mutacją oraz zapis i wczytywanie wag.
+3. Koszt energii za ruch i strojenie. Dobry znak to rosnące narodziny przy spadających odrodzeniach.
+4. Sprawdzenie, czy agenci sami przejmują pola (`owned_tiles` w CSV). Jeśli nie, rozważyć małą premię energii za przejęcie.
