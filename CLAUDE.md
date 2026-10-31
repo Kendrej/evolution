@@ -32,6 +32,7 @@ Zrobione: statystyki i zapis do CSV, losowa mapa, minimalna populacja plemienia,
 Porównanie 5 ziaren po 500 000 kroków (`python tools/compare_inheritance.py 500000 5`) nie pokazało jeszcze wyraźnego efektu dziedziczenia: pod koniec narodziny wynoszą 0,30 z dziedziczeniem i 0,28 bez niego na 1000 kroków, a większość narodzin z dziedziczeniem pochodzi z jednego ziarna (1000).
 
 ## Następne kroki
-1. Silniejszy dobór: odrodzeni agenci nie powinni kopiować wag od losowego żyjącego członka plemienia. Sprawdzić też, co wydarzyło się na ziarnie 1000.
-2. Koszt energii za ruch i strojenie. Dobry znak to rosnące narodziny przy spadających odrodzeniach.
-3. Sprawdzenie, czy agenci sami przejmują pola (`owned_tiles` w CSV). Jeśli nie, rozważyć małą premię energii za przejęcie.
+1. Do omówienia na początku: agenci rozmnażają się przez dotyk w bazie, ale nie wiedzą, czy partner jest w pobliżu, bo `Senses` nie ma takiego zmysłu. Prawdopodobnie trzeba dodać kierunek i odległość do najbliższego gotowego partnera z plemienia. Zmiana liczby wejść zmienia liczbę wag, więc obecne modele, w tym `models/main.json`, przestaną się wczytywać.
+2. Silniejszy dobór: odrodzeni agenci nie powinni kopiować wag od losowego żyjącego członka plemienia. Sprawdzić też, co wydarzyło się na ziarnie 1000.
+3. Koszt energii za ruch i strojenie. Dobry znak to rosnące narodziny przy spadających odrodzeniach.
+4. Sprawdzenie, czy agenci sami przejmują pola (`owned_tiles` w CSV). Jeśli nie, rozważyć małą premię energii za przejęcie.
