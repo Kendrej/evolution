@@ -23,10 +23,9 @@ Symulacja plemion w Ruście (macroquad). Celem jest neuroewolucja: każdy agent 
 ## Stan projektu
 Zrobione: statystyki i zapis do CSV, losowa mapa, minimalna populacja plemienia, przyspieszenie, struktura `Brain` i `Action`, zmysły agenta `Senses`, wykresy z plików CSV.
 
-`Brain` to na razie tylko miejsce na sieć: dostaje zmysły, ale ich nie używa, a `decide` losuje skręt i zwraca stałą prędkość. Nie sprawdzono jeszcze na danych, czy wydzielenie `Brain` i zmysły nie zmieniły zachowania agentów.
+`Brain` to sieć neuronowa z 11 wejściami, 8 neuronami ukrytymi i 2 wyjściami (114 wag). Wagi są losowe i jeszcze się nie dziedziczą, więc agenci na razie niczego się nie uczą.
 
 ## Następne kroki
-1. Sieć neuronowa zamiast losowego skrętu i stałej prędkości, na początku z losowymi wagami i bez dziedziczenia.
-2. Dziedziczenie wag z mutacją oraz zapis i wczytywanie wag.
-3. Koszt energii za ruch i strojenie. Dobry znak to rosnące narodziny przy spadających odrodzeniach.
-4. Sprawdzenie, czy agenci sami przejmują pola (`owned_tiles` w CSV). Jeśli nie, rozważyć małą premię energii za przejęcie.
+1. Dziedziczenie wag z mutacją oraz zapis i wczytywanie wag.
+2. Koszt energii za ruch i strojenie. Dobry znak to rosnące narodziny przy spadających odrodzeniach.
+3. Sprawdzenie, czy agenci sami przejmują pola (`owned_tiles` w CSV). Jeśli nie, rozważyć małą premię energii za przejęcie.
