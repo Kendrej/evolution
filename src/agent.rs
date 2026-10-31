@@ -88,14 +88,12 @@ impl Agent{
         }
     }
 
-    pub fn eat_food(&mut self, food_size: f32, tile_size: f32){
-        let new_size = self.size + food_size * 0.2;
-        
-        if new_size <= tile_size/2.0 {
+    pub fn eat_food(&mut self, food_size: f32, terrain: &Terrain){
+        let max_size = terrain.config().tile_size/2.0;
+        let new_size = (self.size + food_size * 0.2).min(max_size);
+
+        if terrain.can_walk(self.x, self.y, new_size) {
             self.size = new_size;
-        }
-        else {
-            self.size = tile_size/2.0;
         }
 
         if self.energy + food_size * 5.0 <= self.max_energy {

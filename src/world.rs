@@ -60,7 +60,7 @@ impl World{
                 if (distance_sq < radius_sum * radius_sum) && (a.is_alive()) && (!f.eaten)
                     && self.terrain.owner_at(f.x, f.y).is_none_or(|owner| owner == a.tribe()){
                     f.eaten = true;
-                    a.eat_food(f.size, self.terrain.config().tile_size);
+                    a.eat_food(f.size, &self.terrain);
                 }
             }
         }
