@@ -30,7 +30,7 @@ impl World{
         }
 
         for _ in 0..num_food{
-            food.push(Food::new_with_random_position(height, width));
+            food.push(Food::new_with_random_position(&terrain));
         }
 
         World{
@@ -94,15 +94,22 @@ struct Food{
 }
 
 impl Food{
-    fn new_with_random_position(height: f32, width: f32) -> Food{
+    fn new_with_random_position(terrain: &Terrain) -> Food{
         let size = 5.0;
-        let x = rand::gen_range(10.0, width - 10.0);
-        let y = rand::gen_range(10.0, height - 10.0);
-        Food{
-            x,
-            y,
-            size,
-            eaten: false
+        let config = terrain.config();
+        loop{
+            let col = rand::gen_range(0, config.cols);
+            let row = rand::gen_range(0, config.rows);
+            let x = (col as f32 * config.tile_size) + config.tile_size/2.0;
+            let y = (row as f32 * config.tile_size) + config.tile_size/2.0;
+            if terrain.is_walkable_at(x, y){
+                return Food{
+                    x,
+                    y,
+                    size,
+                    eaten: false
+                };
+            }
         }
     }
 
