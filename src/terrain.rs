@@ -189,6 +189,24 @@ impl Terrain{
         self.tiles[row][col].is_walkable()
     }
 
+    pub fn can_grow_food_at(&self, x: f32, y: f32) -> bool{
+        if !self.is_walkable_at(x, y){
+            return false
+        }
+
+        let row = (y / self.config.tile_size) as usize;
+        let col = (x / self.config.tile_size) as usize;
+
+        !matches!(self.tiles[row][col].tile_type, TileType::Base(_))
+    }
+
+    pub fn owner_at(&self, x: f32, y: f32) -> Option<usize>{
+        let row = (y / self.config.tile_size) as usize;
+        let col = (x / self.config.tile_size) as usize;
+
+        self.tiles[row][col].owner
+    }
+
     pub fn can_walk(&self, x: f32, y: f32, radius: f32) -> bool {
         self.is_walkable_at(x - radius, y)
         && self.is_walkable_at(x + radius, y)

@@ -2,6 +2,11 @@ use macroquad::prelude::*;
 use crate::agent::Agent;
 use crate::terrain::Terrain;
 use crate::tribe::Tribe;
+
+const FOOD_SPAWN_ATTEMPTS: usize = 3;
+const FOOD_CHANCE_NEUTRAL: f32 = 0.05;
+const FOOD_CHANCE_OWNED: f32 = 0.15;
+
 pub struct World{
     agents: Vec<Agent>,
     food: Vec<Food>,
@@ -29,8 +34,13 @@ impl World{
             agents.push(Agent::spawn_at_tile(tribes[tribe].random_base_tile(), tribe, terrain.config().tile_size));
         }
 
-        for _ in 0..num_food{
-            food.push(Food::new_with_random_position(&terrain));
+        for _ in 0..num_food * 10{
+            if food.len() >= num_food{
+                break;
+            }
+            if let Some((x, y)) = Food::random_free_spot(&terrain, &food){
+                food.push(Food::new(x, y));
+            }
         }
 
         World{
@@ -47,7 +57,8 @@ impl World{
             for f in &mut self.food{
                 let distance_sq = (a.get_x() - f.x).powi(2) + (a.get_y() - f.y).powi(2);
                 let radius_sum = a.get_size() + f.size;
-                if (distance_sq < radius_sum * radius_sum) && (a.is_alive()) && (!f.eaten){
+                if (distance_sq < radius_sum * radius_sum) && (a.is_alive()) && (!f.eaten)
+                    && self.terrain.owner_at(f.x, f.y).is_none_or(|owner| owner == a.tribe()){
                     f.eaten = true;
                     a.eat_food(f.size, self.terrain.config().tile_size);
                 }
@@ -64,6 +75,24 @@ impl World{
 
         self.food.retain(|f| !f.eaten);
         self.agents.retain(|a| !a.is_gone());
+
+        self.spawn_food();
+    }
+
+    fn spawn_food(&mut self){
+        for _ in 0..FOOD_SPAWN_ATTEMPTS{
+            if let Some((x, y)) = Food::random_free_spot(&self.terrain, &self.food){
+                let chance = if self.terrain.owner_at(x, y).is_some(){
+                    FOOD_CHANCE_OWNED
+                }
+                else{
+                    FOOD_CHANCE_NEUTRAL
+                };
+                if rand::gen_range(0.0, 1.0) < chance{
+                    self.food.push(Food::new(x, y));
+                }
+            }
+        }
     }
 
     pub fn draw(&self){
@@ -94,22 +123,27 @@ struct Food{
 }
 
 impl Food{
-    fn new_with_random_position(terrain: &Terrain) -> Food{
-        let size = 5.0;
+    fn new(x: f32, y: f32) -> Food{
+        Food{
+            x,
+            y,
+            size: 5.0,
+            eaten: false
+        }
+    }
+
+    fn random_free_spot(terrain: &Terrain, food: &[Food]) -> Option<(f32, f32)>{
         let config = terrain.config();
-        loop{
-            let col = rand::gen_range(0, config.cols);
-            let row = rand::gen_range(0, config.rows);
-            let x = (col as f32 * config.tile_size) + config.tile_size/2.0;
-            let y = (row as f32 * config.tile_size) + config.tile_size/2.0;
-            if terrain.is_walkable_at(x, y){
-                return Food{
-                    x,
-                    y,
-                    size,
-                    eaten: false
-                };
-            }
+        let col = rand::gen_range(0, config.cols);
+        let row = rand::gen_range(0, config.rows);
+        let x = (col as f32 * config.tile_size) + config.tile_size/2.0;
+        let y = (row as f32 * config.tile_size) + config.tile_size/2.0;
+
+        if terrain.can_grow_food_at(x, y) && !food.iter().any(|f| f.x == x && f.y == y){
+            Some((x, y))
+        }
+        else{
+            None
         }
     }
 
