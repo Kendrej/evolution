@@ -67,16 +67,11 @@ impl Agent{
         distance_sq < radius_sum * radius_sum
     }
 
-    pub fn reproduce_with(&mut self, other: &mut Agent, tile_size: f32, inheritance: bool) -> Agent{
+    pub fn reproduce_with(&mut self, other: &mut Agent, tile_size: f32, brain: Brain) -> Agent{
         self.energy -= REPRODUCTION_COST;
         other.energy -= REPRODUCTION_COST;
         self.reproduction_cooldown = REPRODUCTION_COOLDOWN;
         other.reproduction_cooldown = REPRODUCTION_COOLDOWN;
-        let brain = if inheritance {
-            Brain::child_of(&self.brain, &other.brain)
-        } else {
-            Brain::new()
-        };
         Agent::new(self.x, self.y, self.tribe, REPRODUCTION_COST * 2.0, tile_size, brain)
     }
 

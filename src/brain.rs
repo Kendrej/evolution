@@ -5,7 +5,7 @@ const INPUTS: usize = 11;
 const HIDDEN: usize = 8;
 const OUTPUTS: usize = 2;
 // Kazdy neuron ma wage na kazde wejscie i jedna dodatkowa stala (bias)
-const WEIGHT_COUNT: usize = (INPUTS + 1) * HIDDEN + (HIDDEN + 1) * OUTPUTS;
+pub const WEIGHT_COUNT: usize = (INPUTS + 1) * HIDDEN + (HIDDEN + 1) * OUTPUTS;
 const MAX_TURN: f32 = 0.1;
 const MUTATION_RATE: f32 = 0.1;
 const MUTATION_STRENGTH: f32 = 0.2;
@@ -49,6 +49,7 @@ impl Senses{
     }
 }
 
+#[derive(Clone)]
 pub struct Brain{
     weights: [f32; WEIGHT_COUNT]
 }
@@ -64,8 +65,21 @@ impl Brain{
         }
     }
 
+    // Wczytane wagi musza miec dlugosc WEIGHT_COUNT, co sprawdza Model::load
+    pub fn from_weights(values: &[f32]) -> Brain{
+        let mut weights = [0.0; WEIGHT_COUNT];
+        weights.copy_from_slice(values);
+        Brain{
+            weights
+        }
+    }
+
+    pub fn weights(&self) -> &[f32]{
+        &self.weights
+    }
+
     // Kazda waga dziecka pochodzi losowo od jednego z rodzicow
-    fn crossover(first: &Brain, second: &Brain) -> Brain{
+    pub fn crossover(first: &Brain, second: &Brain) -> Brain{
         let mut weights = first.weights;
         for (weight, other) in weights.iter_mut().zip(&second.weights){
             if gen_range(0.0, 1.0) < 0.5{

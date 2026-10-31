@@ -1,2 +1,4 @@
 /target
 /runs
+/models/*
+!/models/main.json

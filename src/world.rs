@@ -4,6 +4,7 @@ use crate::terrain::Terrain;
 use crate::tribe::Tribe;
 use crate::stats::Stats;
 use crate::brain::{Brain, Senses, relative_direction};
+use crate::model::{Model, ModelSaver, format_steps};
 use std::f32::consts::FRAC_PI_2;
 
 const FOOD_SPAWN_ATTEMPTS: usize = 3;
@@ -14,6 +15,41 @@ const MIN_TRIBE_POPULATION: usize = 5;
 const SIMULATION_SPEEDS: [usize; 3] = [1, 10, 50];
 const STATS_BUTTON_WIDTH: f32 = 130.0;
 const STATS_BUTTON_HEIGHT: f32 = 25.0;
+const MODEL_SAVE_INTERVAL: u64 = 50_000;
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum Mode{
+    Inherit,
+    Random,
+    Demo
+}
+
+impl Mode{
+    // Nazwa przebiegu, ktory zapisuje statystyki i modele. Demo niczego nie zapisuje.
+    pub fn name(self) -> Option<&'static str>{
+        match self{
+            Mode::Inherit => Some("inherit"),
+            Mode::Random => Some("random"),
+            Mode::Demo => None
+        }
+    }
+
+    fn child_brain(self, first: &Brain, second: &Brain) -> Brain{
+        match self{
+            Mode::Inherit => Brain::child_of(first, second),
+            Mode::Random => Brain::new(),
+            Mode::Demo => Brain::crossover(first, second)
+        }
+    }
+
+    fn respawn_brain(self, parent: Option<&Brain>) -> Brain{
+        match (self, parent){
+            (Mode::Inherit, Some(brain)) => brain.mutated(),
+            (Mode::Demo, Some(brain)) => brain.clone(),
+            _ => Brain::new()
+        }
+    }
+}
 
 pub struct World{
     agents: Vec<Agent>,
@@ -24,11 +60,15 @@ pub struct World{
     stats: Stats,
     stats_open: bool,
     speed_index: usize,
-    inheritance: bool
+    mode: Mode,
+    saved_brains: Vec<Vec<Brain>>,
+    saver: Option<ModelSaver>,
+    seed: u32,
+    start_step: u64
 }
 
 impl World{
-    pub fn new(num_agents: usize, num_food: usize, seed: u32, inheritance: bool) -> World{
+    pub fn new(num_agents: usize, num_food: usize, seed: u32, mode: Mode, model: Option<Model>, saver: Option<ModelSaver>) -> World{
         let mut agents = Vec::new();
         let mut food = Vec::new();
         let rows = 60;
@@ -37,14 +77,29 @@ impl World{
         let base_size = 5;
         let terrain = Terrain::new(rows, cols, tile_size, base_size, seed);
         let tribes = Tribe::create_tribes(terrain.config());
-        let stats = Stats::new(seed, tribes.len(), inheritance);
+        let stats = Stats::new(seed, tribes.len(), mode.name());
         let height = terrain.height();
         let width = terrain.width();
         let cam: Camera2D = Camera2D::from_display_rect(Rect::new(0.0, 0.0, width, height));
 
-        for i in 0..num_agents{
-            let tribe = i % 4;
-            agents.push(Agent::spawn_at_tile(tribes[tribe].random_base_tile(), tribe, terrain.config().tile_size, Brain::new()));
+        let start_step = model.as_ref().map_or(0, |m| m.step);
+        let saved_brains: Vec<Vec<Brain>> = model.iter()
+            .flat_map(|m| &m.tribes)
+            .map(|tribe| tribe.iter().map(|weights| Brain::from_weights(weights)).collect())
+            .collect();
+
+        if model.is_some(){
+            for (tribe, brains) in saved_brains.iter().enumerate(){
+                for brain in brains{
+                    agents.push(Agent::spawn_at_tile(tribes[tribe].random_base_tile(), tribe, terrain.config().tile_size, brain.clone()));
+                }
+            }
+        }
+        else{
+            for i in 0..num_agents{
+                let tribe = i % 4;
+                agents.push(Agent::spawn_at_tile(tribes[tribe].random_base_tile(), tribe, terrain.config().tile_size, Brain::new()));
+            }
         }
 
         for _ in 0..num_food * 10{
@@ -65,7 +120,11 @@ impl World{
             stats,
             stats_open: false,
             speed_index: 0,
-            inheritance
+            mode,
+            saved_brains,
+            saver,
+            seed,
+            start_step
         }
     }
 
@@ -115,6 +174,40 @@ impl World{
         self.respawn_tribes();
         self.spawn_food();
         self.record_stats();
+
+        if self.stats.step() % MODEL_SAVE_INTERVAL == 0{
+            self.save_latest();
+        }
+    }
+
+    fn to_model(&self) -> Model{
+        let tribes = (0..self.tribes.len())
+            .map(|tribe| self.agents.iter()
+                .filter(|a| a.is_alive() && a.tribe() == tribe)
+                .map(|a| a.brain().weights().to_vec())
+                .collect())
+            .collect();
+
+        Model{
+            seed: self.seed,
+            step: self.start_step + self.stats.step(),
+            weight_count: crate::brain::WEIGHT_COUNT,
+            tribes,
+            name: String::new(),
+            source: String::new()
+        }
+    }
+
+    pub fn save_latest(&self){
+        if let Some(saver) = &self.saver{
+            saver.save_latest(&self.to_model());
+        }
+    }
+
+    pub fn save_final(&self){
+        if let Some(saver) = &self.saver{
+            saver.save_final(&self.to_model());
+        }
     }
 
     fn toggle_stats_on_click(&mut self){
@@ -132,6 +225,18 @@ impl World{
 
         draw_rectangle(STATS_BUTTON_WIDTH, 0.0, 60.0, STATS_BUTTON_HEIGHT, panel_color);
         draw_text(&format!("x{}", self.steps_per_frame()), STATS_BUTTON_WIDTH + 10.0, 18.0, 20.0, WHITE);
+
+        draw_rectangle(STATS_BUTTON_WIDTH + 60.0, 0.0, 90.0, STATS_BUTTON_HEIGHT, panel_color);
+        draw_text(if self.mode == Mode::Demo { "Demo" } else { "Trening" }, STATS_BUTTON_WIDTH + 70.0, 18.0, 20.0, WHITE);
+
+        // Demo niczego nie uczy, wiec pokazuje stala liczbe krokow modelu
+        let steps = if self.mode == Mode::Demo {
+            format!("Model: {} krokow", format_steps(self.start_step))
+        } else {
+            format!("Kroki: {}", format_steps(self.start_step + self.stats.step()))
+        };
+        draw_rectangle(STATS_BUTTON_WIDTH + 150.0, 0.0, 230.0, STATS_BUTTON_HEIGHT, panel_color);
+        draw_text(&steps, STATS_BUTTON_WIDTH + 160.0, 18.0, 20.0, WHITE);
 
         if !self.stats_open{
             return;
@@ -169,13 +274,18 @@ impl World{
                 .filter(|&index| self.agents[index].is_alive() && self.agents[index].tribe() == i)
                 .collect();
             for _ in alive.len()..MIN_TRIBE_POPULATION{
-                let brain = if self.inheritance && !alive.is_empty(){
-                    let parent = alive[rand::gen_range(0, alive.len())];
-                    self.agents[parent].brain().mutated()
+                // Gdy plemie wymarlo, rodzicem moze byc jeszcze ktos z wczytanego modelu
+                let saved = self.saved_brains.get(i).map_or(&[][..], |brains| &brains[..]);
+                let parent = if !alive.is_empty(){
+                    Some(self.agents[alive[rand::gen_range(0, alive.len())]].brain())
+                }
+                else if !saved.is_empty(){
+                    Some(&saved[rand::gen_range(0, saved.len())])
                 }
                 else{
-                    Brain::new()
+                    None
                 };
+                let brain = self.mode.respawn_brain(parent);
                 self.agents.push(Agent::spawn_at_tile(tribe.random_base_tile(), i, tile_size, brain));
                 self.stats.add_respawn(i);
             }
@@ -195,7 +305,8 @@ impl World{
                     break;
                 }
                 if a.can_reproduce_with(b, &self.terrain){
-                    children.push(a.reproduce_with(b, tile_size, self.inheritance));
+                    let brain = self.mode.child_brain(a.brain(), b.brain());
+                    children.push(a.reproduce_with(b, tile_size, brain));
                 }
             }
         }

@@ -24,18 +24,17 @@ pub struct Stats{
 }
 
 impl Stats{
-    pub fn new(seed: u32, num_tribes: usize, inheritance: bool) -> Stats{
+    pub fn new(seed: u32, num_tribes: usize, mode: Option<&str>) -> Stats{
         Stats{
             seed,
             step: 0,
             tribes: vec![TribeStats::default(); num_tribes],
-            file: Stats::create_file(seed, inheritance)
+            file: mode.and_then(|mode| Stats::create_file(seed, mode))
         }
     }
 
-    fn create_file(seed: u32, inheritance: bool) -> Option<BufWriter<File>>{
+    fn create_file(seed: u32, mode: &str) -> Option<BufWriter<File>>{
         let time = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |t| t.as_secs());
-        let mode = if inheritance { "inherit" } else { "random" };
         let path = format!("runs/run_{}_{}_seed_{}_{}.csv", time, std::process::id(), seed, mode);
 
         let result = fs::create_dir_all("runs")
@@ -105,6 +104,10 @@ impl Stats{
         t.respawns = 0;
         t.lifetime_sum = 0;
         t.food_eaten = 0;
+    }
+
+    pub fn step(&self) -> u64{
+        self.step
     }
 
     pub fn seed(&self) -> u32{
