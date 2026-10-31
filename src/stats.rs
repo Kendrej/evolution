@@ -8,8 +8,10 @@ const STATS_INTERVAL: u64 = 1000;
 struct TribeStats{
     total_births: u32,
     total_deaths: u32,
+    total_respawns: u32,
     births: u32,
     deaths: u32,
+    respawns: u32,
     lifetime_sum: u64,
     food_eaten: u32
 }
@@ -39,7 +41,7 @@ impl Stats{
             .and_then(|_| File::create(&path))
             .and_then(|file| {
                 let mut writer = BufWriter::new(file);
-                writeln!(writer, "step,tribe,alive,births,deaths,avg_lifetime,food_eaten,owned_tiles")?;
+                writeln!(writer, "step,tribe,alive,births,deaths,respawns,avg_lifetime,food_eaten,owned_tiles")?;
                 writer.flush()?;
                 Ok(writer)
             });
@@ -67,6 +69,11 @@ impl Stats{
         self.tribes[tribe].lifetime_sum += lifetime as u64;
     }
 
+    pub fn add_respawn(&mut self, tribe: usize){
+        self.tribes[tribe].total_respawns += 1;
+        self.tribes[tribe].respawns += 1;
+    }
+
     pub fn add_food(&mut self, tribe: usize){
         self.tribes[tribe].food_eaten += 1;
     }
@@ -85,7 +92,7 @@ impl Stats{
         };
 
         if let Some(file) = &mut self.file{
-            let row = format!("{},{},{},{},{},{:.1},{},{}", self.step, tribe, alive, t.births, t.deaths, avg_lifetime, t.food_eaten, owned_tiles);
+            let row = format!("{},{},{},{},{},{},{:.1},{},{}", self.step, tribe, alive, t.births, t.deaths, t.respawns, avg_lifetime, t.food_eaten, owned_tiles);
             if let Err(e) = writeln!(file, "{}", row).and_then(|_| file.flush()){
                 eprintln!("Nie udalo sie zapisac statystyk: {}", e);
                 self.file = None;
@@ -94,6 +101,7 @@ impl Stats{
 
         t.births = 0;
         t.deaths = 0;
+        t.respawns = 0;
         t.lifetime_sum = 0;
         t.food_eaten = 0;
     }
@@ -108,5 +116,9 @@ impl Stats{
 
     pub fn total_deaths(&self, tribe: usize) -> u32{
         self.tribes[tribe].total_deaths
+    }
+
+    pub fn total_respawns(&self, tribe: usize) -> u32{
+        self.tribes[tribe].total_respawns
     }
 }

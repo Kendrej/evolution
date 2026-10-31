@@ -8,6 +8,7 @@ const FOOD_SPAWN_ATTEMPTS: usize = 3;
 const FOOD_CHANCE_NEUTRAL: f32 = 0.05;
 const FOOD_CHANCE_OWNED: f32 = 0.15;
 const MAX_AGENTS: usize = 300;
+const MIN_TRIBE_POPULATION: usize = 5;
 const STATS_BUTTON_WIDTH: f32 = 130.0;
 const STATS_BUTTON_HEIGHT: f32 = 25.0;
 
@@ -93,6 +94,7 @@ impl World{
         self.agents.retain(|a| !a.is_gone());
 
         self.reproduce_agents();
+        self.respawn_tribes();
         self.spawn_food();
         self.record_stats();
     }
@@ -114,13 +116,13 @@ impl World{
             return;
         }
 
-        draw_rectangle(0.0, STATS_BUTTON_HEIGHT, 400.0, 150.0, panel_color);
+        draw_rectangle(0.0, STATS_BUTTON_HEIGHT, 520.0, 150.0, panel_color);
         draw_text(&format!("Agenci: {}", self.agents.len()), 10.0, 45.0, 20.0, WHITE);
         draw_text(&format!("Jedzenie: {}", self.food.len()), 10.0, 65.0, 20.0, WHITE);
 
         for (i, tribe) in self.tribes.iter().enumerate(){
             let alive = self.agents.iter().filter(|a| a.is_alive() && a.tribe() == i).count();
-            let text = format!("Plemie {}: zywi {}, narodziny {}, smierci {}", i + 1, alive, self.stats.total_births(i), self.stats.total_deaths(i));
+            let text = format!("Plemie {}: zywi {}, narodziny {}, smierci {}, odrodzenia {}", i + 1, alive, self.stats.total_births(i), self.stats.total_deaths(i), self.stats.total_respawns(i));
             draw_text(&text, 10.0, 85.0 + i as f32 * 20.0, 20.0, tribe.color());
         }
 
@@ -135,6 +137,18 @@ impl World{
         for i in 0..self.tribes.len(){
             let alive = self.agents.iter().filter(|a| a.is_alive() && a.tribe() == i).count();
             self.stats.write_row(i, alive, self.terrain.owned_tiles(i));
+        }
+    }
+
+    fn respawn_tribes(&mut self){
+        let tile_size = self.terrain.config().tile_size;
+
+        for (i, tribe) in self.tribes.iter().enumerate(){
+            let alive = self.agents.iter().filter(|a| a.is_alive() && a.tribe() == i).count();
+            for _ in alive..MIN_TRIBE_POPULATION{
+                self.agents.push(Agent::spawn_at_tile(tribe.random_base_tile(), i, tile_size));
+                self.stats.add_respawn(i);
+            }
         }
     }
 
