@@ -23,9 +23,12 @@ Symulacja plemion w Ruście (macroquad). Celem jest neuroewolucja: każdy agent 
 ## Stan projektu
 Zrobione: statystyki i zapis do CSV, losowa mapa, minimalna populacja plemienia, przyspieszenie, struktura `Brain` i `Action`, zmysły agenta `Senses`, wykresy z plików CSV.
 
-`Brain` to sieć neuronowa z 11 wejściami, 8 neuronami ukrytymi i 2 wyjściami (114 wag). Wagi są losowe i jeszcze się nie dziedziczą, więc agenci na razie niczego się nie uczą.
+`Brain` to sieć neuronowa z 11 wejściami, 8 neuronami ukrytymi i 2 wyjściami (114 wag). Dzieci i odrodzeni agenci dziedziczą wagi z mutacją.
+
+Porównanie 5 ziaren po 500 000 kroków (`python tools/compare_inheritance.py 500000 5`) nie pokazało jeszcze wyraźnego efektu dziedziczenia: pod koniec narodziny wynoszą 0,30 z dziedziczeniem i 0,28 bez niego na 1000 kroków, a większość narodzin z dziedziczeniem pochodzi z jednego ziarna (1000).
 
 ## Następne kroki
-1. Dziedziczenie wag z mutacją oraz zapis i wczytywanie wag.
-2. Koszt energii za ruch i strojenie. Dobry znak to rosnące narodziny przy spadających odrodzeniach.
-3. Sprawdzenie, czy agenci sami przejmują pola (`owned_tiles` w CSV). Jeśli nie, rozważyć małą premię energii za przejęcie.
+1. Silniejszy dobór: odrodzeni agenci nie powinni kopiować wag od losowego żyjącego członka plemienia. Sprawdzić też, co wydarzyło się na ziarnie 1000.
+2. Zapis i wczytywanie wag.
+3. Koszt energii za ruch i strojenie. Dobry znak to rosnące narodziny przy spadających odrodzeniach.
+4. Sprawdzenie, czy agenci sami przejmują pola (`owned_tiles` w CSV). Jeśli nie, rozważyć małą premię energii za przejęcie.

@@ -26,7 +26,7 @@ const REPRODUCTION_COST: f32 = 25.0;
 const REPRODUCTION_COOLDOWN: i32 = 600;
 
 impl Agent{
-    fn new(x: f32, y: f32, tribe: usize, energy: f32, tile_size: f32) -> Agent{
+    fn new(x: f32, y: f32, tribe: usize, energy: f32, tile_size: f32, brain: Brain) -> Agent{
         Agent{
             x,
             y,
@@ -39,14 +39,14 @@ impl Agent{
             timer_of_death: 0,
             reproduction_cooldown: REPRODUCTION_COOLDOWN,
             age: 0,
-            brain: Brain::new()
+            brain
         }
     }
 
-    pub fn spawn_at_tile(tile: (usize, usize), tribe: usize, tile_size: f32) -> Agent{
+    pub fn spawn_at_tile(tile: (usize, usize), tribe: usize, tile_size: f32, brain: Brain) -> Agent{
         let x = (tile.0 as f32 * tile_size) + tile_size/2.0;
         let y = (tile.1 as f32 * tile_size) + tile_size/2.0;
-        Agent::new(x, y, tribe, 100.0, tile_size)
+        Agent::new(x, y, tribe, 100.0, tile_size, brain)
     }
 
     pub fn is_ready_to_reproduce(&self) -> bool{
@@ -67,12 +67,17 @@ impl Agent{
         distance_sq < radius_sum * radius_sum
     }
 
-    pub fn reproduce_with(&mut self, other: &mut Agent, tile_size: f32) -> Agent{
+    pub fn reproduce_with(&mut self, other: &mut Agent, tile_size: f32, inheritance: bool) -> Agent{
         self.energy -= REPRODUCTION_COST;
         other.energy -= REPRODUCTION_COST;
         self.reproduction_cooldown = REPRODUCTION_COOLDOWN;
         other.reproduction_cooldown = REPRODUCTION_COOLDOWN;
-        Agent::new(self.x, self.y, self.tribe, REPRODUCTION_COST * 2.0, tile_size)
+        let brain = if inheritance {
+            Brain::child_of(&self.brain, &other.brain)
+        } else {
+            Brain::new()
+        };
+        Agent::new(self.x, self.y, self.tribe, REPRODUCTION_COST * 2.0, tile_size, brain)
     }
 
 
@@ -167,6 +172,10 @@ impl Agent{
 
     pub fn is_gone(&self) -> bool{
         self.size == 0.0 && !self.alive
+    }
+
+    pub fn brain(&self) -> &Brain{
+        &self.brain
     }
 
     pub fn angle(&self) -> f32{

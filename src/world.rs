@@ -3,7 +3,7 @@ use crate::agent::Agent;
 use crate::terrain::Terrain;
 use crate::tribe::Tribe;
 use crate::stats::Stats;
-use crate::brain::{Senses, relative_direction};
+use crate::brain::{Brain, Senses, relative_direction};
 use std::f32::consts::FRAC_PI_2;
 
 const FOOD_SPAWN_ATTEMPTS: usize = 3;
@@ -23,11 +23,12 @@ pub struct World{
     tribes: Vec<Tribe>,
     stats: Stats,
     stats_open: bool,
-    speed_index: usize
+    speed_index: usize,
+    inheritance: bool
 }
 
 impl World{
-    pub fn new(num_agents: usize, num_food: usize, seed: u32) -> World{
+    pub fn new(num_agents: usize, num_food: usize, seed: u32, inheritance: bool) -> World{
         let mut agents = Vec::new();
         let mut food = Vec::new();
         let rows = 60;
@@ -36,14 +37,14 @@ impl World{
         let base_size = 5;
         let terrain = Terrain::new(rows, cols, tile_size, base_size, seed);
         let tribes = Tribe::create_tribes(terrain.config());
-        let stats = Stats::new(seed, tribes.len());
+        let stats = Stats::new(seed, tribes.len(), inheritance);
         let height = terrain.height();
         let width = terrain.width();
         let cam: Camera2D = Camera2D::from_display_rect(Rect::new(0.0, 0.0, width, height));
 
         for i in 0..num_agents{
             let tribe = i % 4;
-            agents.push(Agent::spawn_at_tile(tribes[tribe].random_base_tile(), tribe, terrain.config().tile_size));
+            agents.push(Agent::spawn_at_tile(tribes[tribe].random_base_tile(), tribe, terrain.config().tile_size, Brain::new()));
         }
 
         for _ in 0..num_food * 10{
@@ -63,7 +64,8 @@ impl World{
             tribes,
             stats,
             stats_open: false,
-            speed_index: 0
+            speed_index: 0,
+            inheritance
         }
     }
 
@@ -163,9 +165,18 @@ impl World{
         let tile_size = self.terrain.config().tile_size;
 
         for (i, tribe) in self.tribes.iter().enumerate(){
-            let alive = self.agents.iter().filter(|a| a.is_alive() && a.tribe() == i).count();
-            for _ in alive..MIN_TRIBE_POPULATION{
-                self.agents.push(Agent::spawn_at_tile(tribe.random_base_tile(), i, tile_size));
+            let alive: Vec<usize> = (0..self.agents.len())
+                .filter(|&index| self.agents[index].is_alive() && self.agents[index].tribe() == i)
+                .collect();
+            for _ in alive.len()..MIN_TRIBE_POPULATION{
+                let brain = if self.inheritance && !alive.is_empty(){
+                    let parent = alive[rand::gen_range(0, alive.len())];
+                    self.agents[parent].brain().mutated()
+                }
+                else{
+                    Brain::new()
+                };
+                self.agents.push(Agent::spawn_at_tile(tribe.random_base_tile(), i, tile_size, brain));
                 self.stats.add_respawn(i);
             }
         }
@@ -184,7 +195,7 @@ impl World{
                     break;
                 }
                 if a.can_reproduce_with(b, &self.terrain){
-                    children.push(a.reproduce_with(b, tile_size));
+                    children.push(a.reproduce_with(b, tile_size, self.inheritance));
                 }
             }
         }

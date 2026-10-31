@@ -7,6 +7,8 @@ const OUTPUTS: usize = 2;
 // Kazdy neuron ma wage na kazde wejscie i jedna dodatkowa stala (bias)
 const WEIGHT_COUNT: usize = (INPUTS + 1) * HIDDEN + (HIDDEN + 1) * OUTPUTS;
 const MAX_TURN: f32 = 0.1;
+const MUTATION_RATE: f32 = 0.1;
+const MUTATION_STRENGTH: f32 = 0.2;
 
 pub struct Action{
     pub turn: f32,
@@ -60,6 +62,35 @@ impl Brain{
         Brain{
             weights
         }
+    }
+
+    // Kazda waga dziecka pochodzi losowo od jednego z rodzicow
+    fn crossover(first: &Brain, second: &Brain) -> Brain{
+        let mut weights = first.weights;
+        for (weight, other) in weights.iter_mut().zip(&second.weights){
+            if gen_range(0.0, 1.0) < 0.5{
+                *weight = *other;
+            }
+        }
+        Brain{
+            weights
+        }
+    }
+
+    pub fn mutated(&self) -> Brain{
+        let mut weights = self.weights;
+        for weight in &mut weights{
+            if gen_range(0.0, 1.0) < MUTATION_RATE{
+                *weight += gen_range(-MUTATION_STRENGTH, MUTATION_STRENGTH);
+            }
+        }
+        Brain{
+            weights
+        }
+    }
+
+    pub fn child_of(first: &Brain, second: &Brain) -> Brain{
+        Brain::crossover(first, second).mutated()
     }
 
     pub fn decide(&self, senses: &Senses) -> Action{
@@ -140,6 +171,31 @@ mod tests{
     #[test]
     fn large_angle_is_wrapped(){
         assert_close(relative_direction(0.0, 0.0, TAU * 5.0, 10.0, 0.0), 0.0);
+    }
+
+    #[test]
+    fn crossover_takes_each_weight_from_a_parent(){
+        let first = Brain::new();
+        let second = Brain::new();
+        let child = Brain::crossover(&first, &second);
+        for i in 0..WEIGHT_COUNT{
+            assert!(child.weights[i] == first.weights[i] || child.weights[i] == second.weights[i]);
+        }
+    }
+
+    #[test]
+    fn mutation_changes_some_weights_by_a_small_amount(){
+        let parent = Brain::new();
+        let child = parent.mutated();
+        let mut changed = 0;
+        for i in 0..WEIGHT_COUNT{
+            let difference = (child.weights[i] - parent.weights[i]).abs();
+            assert!(difference <= MUTATION_STRENGTH + 0.001);
+            if difference > 0.0{
+                changed += 1;
+            }
+        }
+        assert!(changed > 0 && changed < WEIGHT_COUNT);
     }
 
     #[test]
