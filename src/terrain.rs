@@ -106,7 +106,7 @@ impl Terrain{
     }
 
     fn generate(config: &TerrainConfig, attempt: u32) -> Vec<Vec<Tile>>{
-        let perlin = Perlin::new(config.seed + attempt);
+        let perlin = Perlin::new(config.seed.wrapping_add(attempt));
 
         
         let mut tiles= Vec::new();
@@ -205,6 +205,10 @@ impl Terrain{
         let col = (x / self.config.tile_size) as usize;
 
         matches!(self.tiles[row][col].tile_type, TileType::Base(t) if t as usize == tribe)
+    }
+
+    pub fn owned_tiles(&self, tribe: usize) -> usize{
+        self.tiles.iter().flatten().filter(|tile| tile.owner == Some(tribe)).count()
     }
 
     pub fn owner_at(&self, x: f32, y: f32) -> Option<usize>{

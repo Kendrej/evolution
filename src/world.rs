@@ -2,30 +2,36 @@ use macroquad::prelude::*;
 use crate::agent::Agent;
 use crate::terrain::Terrain;
 use crate::tribe::Tribe;
+use crate::stats::Stats;
 
 const FOOD_SPAWN_ATTEMPTS: usize = 3;
 const FOOD_CHANCE_NEUTRAL: f32 = 0.05;
 const FOOD_CHANCE_OWNED: f32 = 0.15;
 const MAX_AGENTS: usize = 300;
+const STATS_BUTTON_WIDTH: f32 = 130.0;
+const STATS_BUTTON_HEIGHT: f32 = 25.0;
 
 pub struct World{
     agents: Vec<Agent>,
     food: Vec<Food>,
     camera: Camera2D,
     terrain: Terrain,
-    tribes: Vec<Tribe>
+    tribes: Vec<Tribe>,
+    stats: Stats,
+    stats_open: bool
 }
 
 impl World{
-    pub fn new(num_agents: usize, num_food: usize) -> World{
+    pub fn new(num_agents: usize, num_food: usize, seed: u32) -> World{
         let mut agents = Vec::new();
         let mut food = Vec::new();
         let rows = 60;
         let cols = 60;
         let tile_size = 25.0;
         let base_size = 5;
-        let terrain = Terrain::new(rows, cols, tile_size, base_size, 200);
+        let terrain = Terrain::new(rows, cols, tile_size, base_size, seed);
         let tribes = Tribe::create_tribes(terrain.config());
+        let stats = Stats::new(seed, tribes.len());
         let height = terrain.height();
         let width = terrain.width();
         let cam: Camera2D = Camera2D::from_display_rect(Rect::new(0.0, 0.0, width, height));
@@ -49,11 +55,15 @@ impl World{
             food,
             camera: cam,
             terrain,
-            tribes
+            tribes,
+            stats,
+            stats_open: false
         }
     }
 
     pub fn update(&mut self){
+        self.toggle_stats_on_click();
+
         for a in &mut self.agents{
             for f in &mut self.food{
                 let distance_sq = (a.get_x() - f.x).powi(2) + (a.get_y() - f.y).powi(2);
@@ -62,14 +72,19 @@ impl World{
                     && self.terrain.owner_at(f.x, f.y).is_none_or(|owner| owner == a.tribe()){
                     f.eaten = true;
                     a.eat_food(f.size, &self.terrain);
+                    self.stats.add_food(a.tribe());
                 }
             }
         }
 
         for a in &mut self.agents{
+            let was_alive = a.is_alive();
             a.update(&self.terrain);
             if a.is_alive(){
                 self.terrain.capture(a.get_x(), a.get_y(), a.tribe());
+            }
+            else if was_alive{
+                self.stats.add_death(a.tribe(), a.age());
             }
         }
         self.terrain.update_capture_status();
@@ -79,6 +94,48 @@ impl World{
 
         self.reproduce_agents();
         self.spawn_food();
+        self.record_stats();
+    }
+
+    fn toggle_stats_on_click(&mut self){
+        let (mouse_x, mouse_y) = mouse_position();
+        if is_mouse_button_pressed(MouseButton::Left) && mouse_x <= STATS_BUTTON_WIDTH && mouse_y <= STATS_BUTTON_HEIGHT{
+            self.stats_open = !self.stats_open;
+        }
+    }
+
+    fn draw_stats(&self){
+        let panel_color = Color::from_rgba(0, 0, 0, 200);
+        let label = if self.stats_open { "Statystyki -" } else { "Statystyki +" };
+        draw_rectangle(0.0, 0.0, STATS_BUTTON_WIDTH, STATS_BUTTON_HEIGHT, panel_color);
+        draw_text(label, 10.0, 18.0, 20.0, WHITE);
+
+        if !self.stats_open{
+            return;
+        }
+
+        draw_rectangle(0.0, STATS_BUTTON_HEIGHT, 400.0, 150.0, panel_color);
+        draw_text(&format!("Agenci: {}", self.agents.len()), 10.0, 45.0, 20.0, WHITE);
+        draw_text(&format!("Jedzenie: {}", self.food.len()), 10.0, 65.0, 20.0, WHITE);
+
+        for (i, tribe) in self.tribes.iter().enumerate(){
+            let alive = self.agents.iter().filter(|a| a.is_alive() && a.tribe() == i).count();
+            let text = format!("Plemie {}: zywi {}, narodziny {}, smierci {}", i + 1, alive, self.stats.total_births(i), self.stats.total_deaths(i));
+            draw_text(&text, 10.0, 85.0 + i as f32 * 20.0, 20.0, tribe.color());
+        }
+
+        draw_text(&format!("Ziarno: {}", self.stats.seed()), 10.0, 165.0, 20.0, WHITE);
+    }
+
+    fn record_stats(&mut self){
+        if !self.stats.tick(){
+            return;
+        }
+
+        for i in 0..self.tribes.len(){
+            let alive = self.agents.iter().filter(|a| a.is_alive() && a.tribe() == i).count();
+            self.stats.write_row(i, alive, self.terrain.owned_tiles(i));
+        }
     }
 
     fn reproduce_agents(&mut self){
@@ -97,6 +154,10 @@ impl World{
                     children.push(a.reproduce_with(b, tile_size));
                 }
             }
+        }
+
+        for child in &children{
+            self.stats.add_birth(child.tribe());
         }
 
         self.agents.extend(children);
@@ -133,8 +194,7 @@ impl World{
 
         set_default_camera();
 
-        draw_text(&format!("Agenci: {}", self.agents.len()), 10.0, 20.0, 20.0, Color::from_rgba(255, 255, 255, 255));
-        draw_text(&format!("Jedzenie: {}", self.food.len()), 10.0, 40.0, 20.0, Color::from_rgba(255, 255, 255, 255));
+        self.draw_stats();
     }
 }
 

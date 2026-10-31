@@ -31,7 +31,7 @@ impl Tribe {
             color,
             base_min: (min_x, min_y),
             base_max: (max_x, max_y),
-        }   
+        }
     }
 
     pub fn create_tribes(config: &TerrainConfig) -> Vec<Tribe> {

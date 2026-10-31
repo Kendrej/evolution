@@ -14,7 +14,8 @@ pub struct Agent{
     max_energy: f32,
     alive: bool,
     timer_of_death: i32,
-    reproduction_cooldown: i32
+    reproduction_cooldown: i32,
+    age: u32
 }
 
 const TIME_OF_DYING: i32 = 500;
@@ -36,7 +37,8 @@ impl Agent{
             max_energy: 100.0,
             alive: true,
             timer_of_death: 0,
-            reproduction_cooldown: REPRODUCTION_COOLDOWN
+            reproduction_cooldown: REPRODUCTION_COOLDOWN,
+            age: 0
         }
     }
 
@@ -87,6 +89,8 @@ impl Agent{
             if terrain.can_walk(self.x, new_y, self.size){
                 self.y = new_y;
             }
+
+            self.age += 1;
 
             if self.reproduction_cooldown > 0 {
                 self.reproduction_cooldown -= 1;
@@ -162,6 +166,10 @@ impl Agent{
 
     pub fn is_gone(&self) -> bool{
         self.size == 0.0 && !self.alive
+    }
+
+    pub fn age(&self) -> u32{
+        self.age
     }
 
     pub fn is_alive(&self) -> bool{
