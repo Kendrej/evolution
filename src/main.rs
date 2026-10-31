@@ -4,6 +4,7 @@ mod agent;
 mod terrain;
 mod tribe;
 mod stats;
+mod brain;
 use world::World;
 use std::time::{SystemTime, UNIX_EPOCH};
 

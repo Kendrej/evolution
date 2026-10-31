@@ -1,5 +1,6 @@
 use macroquad::prelude::*;
 use crate::terrain::Terrain;
+use crate::brain::Brain;
 use macroquad::rand::gen_range;
 use crate::terrain::mix;
 use std::f32::consts::TAU;
@@ -15,7 +16,8 @@ pub struct Agent{
     alive: bool,
     timer_of_death: i32,
     reproduction_cooldown: i32,
-    age: u32
+    age: u32,
+    brain: Brain
 }
 
 const TIME_OF_DYING: i32 = 500;
@@ -38,7 +40,8 @@ impl Agent{
             alive: true,
             timer_of_death: 0,
             reproduction_cooldown: REPRODUCTION_COOLDOWN,
-            age: 0
+            age: 0,
+            brain: Brain::new()
         }
     }
 
@@ -78,7 +81,8 @@ impl Agent{
 
     pub fn update(&mut self, terrain: &Terrain){
         if self.alive{
-            self.angle += rand::gen_range(-0.1, 0.1);
+            let action = self.brain.decide();
+            self.angle += action.turn;
         
             let new_x = self.x + self.speed * self.angle.cos();
             let new_y = self.y + self.speed * self.angle.sin();
