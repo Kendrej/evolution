@@ -279,7 +279,12 @@ impl World{
 
         for i in 0..self.tribes.len(){
             let alive = self.agents.iter().filter(|a| a.is_alive() && a.tribe() == i).count();
-            self.stats.write_row(i, alive, self.terrain.owned_tiles(i));
+            let in_base: Vec<&Agent> = self.agents.iter()
+                .filter(|a| a.is_alive() && a.tribe() == i && self.terrain.is_base_of(a.get_x(), a.get_y(), i))
+                .collect();
+            let ready_in_base = in_base.iter().filter(|a| a.is_ready_to_reproduce()).count();
+            let ready = self.agents.iter().filter(|a| a.tribe() == i && a.is_ready_to_reproduce()).count();
+            self.stats.write_row(i, alive, self.terrain.owned_tiles(i), in_base.len(), ready_in_base, ready);
         }
     }
 

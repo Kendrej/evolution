@@ -52,7 +52,7 @@ impl Stats{
             .and_then(|_| File::create(&path))
             .and_then(|file| {
                 let mut writer = BufWriter::new(file);
-                writeln!(writer, "step,tribe,alive,births,deaths,respawns,avg_lifetime,food_eaten,owned_tiles")?;
+                writeln!(writer, "step,tribe,alive,births,deaths,respawns,avg_lifetime,food_eaten,owned_tiles,in_base,ready_in_base,ready")?;
                 writer.flush()?;
                 Ok(writer)
             });
@@ -94,7 +94,7 @@ impl Stats{
         self.step % STATS_INTERVAL == 0
     }
 
-    pub fn write_row(&mut self, tribe: usize, alive: usize, owned_tiles: usize){
+    pub fn write_row(&mut self, tribe: usize, alive: usize, owned_tiles: usize, in_base: usize, ready_in_base: usize, ready: usize){
         let t = &mut self.tribes[tribe];
         let avg_lifetime = if t.deaths > 0 {
             t.lifetime_sum as f32 / t.deaths as f32
@@ -103,7 +103,7 @@ impl Stats{
         };
 
         if let Some(file) = &mut self.file{
-            let row = format!("{},{},{},{},{},{},{:.1},{},{}", self.step, tribe, alive, t.births, t.deaths, t.respawns, avg_lifetime, t.food_eaten, owned_tiles);
+            let row = format!("{},{},{},{},{},{},{:.1},{},{},{},{},{}", self.step, tribe, alive, t.births, t.deaths, t.respawns, avg_lifetime, t.food_eaten, owned_tiles, in_base, ready_in_base, ready);
             if let Err(e) = writeln!(file, "{}", row).and_then(|_| file.flush()){
                 eprintln!("Nie udalo sie zapisac statystyk: {}", e);
                 self.file = None;

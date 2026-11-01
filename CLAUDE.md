@@ -36,9 +36,13 @@ Dzieci dziedziczą wagi po rodzicach z mutacją. W treningu odrodzeni agenci dos
 
 Stare modele usunięto przy dodaniu zmysłu partnera, więc `models/main.json` powstanie dopiero po oznaczeniu nowej populacji gwiazdką.
 
-Porównanie 5 ziaren po 500 000 kroków (`python tools/compare_inheritance.py 500000 5`, suma z 5 ziaren): lista rodziców dała 2214 narodzin wobec 392 przy kopiowaniu od losowego żyjącego i 667 bez dziedziczenia. W ostatnich 100 000 kroków było to 550 narodzin wobec 52. Odrodzenia nie spadły (1253 wobec 1088 w ostatnich 100 000 kroków), a zajęte pola spadły o około 30%. Nie wiadomo jeszcze, czy agenci szukają partnerów, czy po prostu trzymają się bazy.
+Porównanie 5 ziaren po 500 000 kroków (`python tools/compare_inheritance.py 500000 5`, suma z 5 ziaren): lista rodziców dała 2214 narodzin wobec 392 przy kopiowaniu od losowego żyjącego i 667 bez dziedziczenia. W ostatnich 100 000 kroków było to 550 narodzin wobec 52. Odrodzenia nie spadły (1253 wobec 1088 w ostatnich 100 000 kroków), a zajęte pola spadły o około 30%.
+
+Pomiar `in_base` i `ready_in_base` (średnio na plemię, ostatnie 100 000 kroków): z listą rodziców w bazie jest 1,39 z 6,05 żywych, a gotowych 0,27, bez dziedziczenia 1,08 z 5,04 i 0,23. Agenci nie trzymają się więc bazy bardziej niż losowe sieci.
+
+Długi test, 5 ziaren po 2 000 000 kroków (`runs/comparisons/2026-11-01_10-23_dlugi_test/`), pokazał uczenie: w ostatnich 500 000 kroków narodziny wynoszą 6914 z listą rodziców i 609 bez dziedziczenia, odrodzenia 3551 i 6330, a żywi na plemię 13,4 i 5,1. Bez dziedziczenia nic się nie zmienia w czasie. Narodziny przegoniły odrodzenia w sumie, ale nie na ziarnie 1004, a wzrost zwalnia. Gotowych jest 8,4 na plemię, z czego w bazie tylko 0,44, więc gotowy agent rozmnaża się średnio raz na około 6000 kroków, choć przerwa trwa 600. Zajęte pola są na końcu podobne w obu trybach (721 i 795 na plemię), więc wcześniejszy spadek był przejściowy.
 
 ## Następne kroki
-1. Sprawdzić, co agenci faktycznie robią: czy szukają partnerów, czy trzymają się bazy. Porównać ziarno 1002 (najwięcej narodzin) z pozostałymi.
+1. Limit wieku agenta (np. 15 000 kroków), żeby szybciej wymieniać pokolenia i mocniej nagradzać powrót do bazy. Sprawdzić na tych samych ziarnach przez 2 000 000 kroków.
 2. Koszt energii za ruch i strojenie. Dobry znak to rosnące narodziny przy spadających odrodzeniach.
-3. Sprawdzenie, czy agenci sami przejmują pola (`owned_tiles` w CSV). Jeśli nie, rozważyć małą premię energii za przejęcie.
+3. Sprawdzenie, czy przejmowanie pól jest celowe. Pola zajmują też losowe sieci, więc samo `owned_tiles` tego nie rozstrzyga.

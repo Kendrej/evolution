@@ -27,6 +27,9 @@ TRIBE_PANELS = [
     ("deaths", "Śmierci", True),
     ("avg_lifetime", "Średnia długość życia (kroki)", True),
     ("food_eaten", "Zjedzone jedzenie", True),
+    ("in_base", "Agenci we własnej bazie", True),
+    ("ready_in_base", "Gotowi do rozmnażania w bazie", True),
+    ("ready", "Wszyscy gotowi do rozmnażania", True),
 ]
 
 
@@ -87,7 +90,7 @@ def plot(path):
     steps = sorted({int(row["step"]) for row in rows})
     tribes = sorted({int(row["tribe"]) for row in rows})
 
-    figure, axes = plt.subplots(4, 2, figsize=(14, 14), sharex=True)
+    figure, axes = plt.subplots(6, 2, figsize=(14, 20), sharex=True)
     axes = axes.flatten()
 
     births = smooth(total_series(rows, "births"))
@@ -97,7 +100,8 @@ def plot(path):
     axes[0].set_title("Główna miara uczenia: wszystkie plemiona")
     axes[0].legend()
 
-    for axis, (column, title, smoothed) in zip(axes[1:], TRIBE_PANELS):
+    panels = [panel for panel in TRIBE_PANELS if panel[0] in columns]
+    for axis, (column, title, smoothed) in zip(axes[1:], panels):
         for tribe in tribes:
             values = tribe_series(rows, tribe, column)
             if smoothed:
