@@ -13,6 +13,8 @@ struct TribeStats{
     total_births: u32,
     total_deaths: u32,
     total_respawns: u32,
+    total_kills: u32,
+    kills: u32,
     births: u32,
     deaths: u32,
     respawns: u32,
@@ -52,7 +54,7 @@ impl Stats{
             .and_then(|_| File::create(&path))
             .and_then(|file| {
                 let mut writer = BufWriter::new(file);
-                writeln!(writer, "step,tribe,alive,births,deaths,respawns,avg_lifetime,food_eaten,owned_tiles,in_base,ready_in_base,ready")?;
+                writeln!(writer, "step,tribe,alive,births,deaths,respawns,avg_lifetime,food_eaten,owned_tiles,in_base,ready_in_base,ready,kills")?;
                 writer.flush()?;
                 Ok(writer)
             });
@@ -85,6 +87,11 @@ impl Stats{
         self.tribes[tribe].respawns += 1;
     }
 
+    pub fn add_kill(&mut self, tribe: usize){
+        self.tribes[tribe].total_kills += 1;
+        self.tribes[tribe].kills += 1;
+    }
+
     pub fn add_food(&mut self, tribe: usize){
         self.tribes[tribe].food_eaten += 1;
     }
@@ -103,7 +110,7 @@ impl Stats{
         };
 
         if let Some(file) = &mut self.file{
-            let row = format!("{},{},{},{},{},{},{:.1},{},{},{},{},{}", self.step, tribe, alive, t.births, t.deaths, t.respawns, avg_lifetime, t.food_eaten, owned_tiles, in_base, ready_in_base, ready);
+            let row = format!("{},{},{},{},{},{},{:.1},{},{},{},{},{},{}", self.step, tribe, alive, t.births, t.deaths, t.respawns, avg_lifetime, t.food_eaten, owned_tiles, in_base, ready_in_base, ready, t.kills);
             if let Err(e) = writeln!(file, "{}", row).and_then(|_| file.flush()){
                 eprintln!("Nie udalo sie zapisac statystyk: {}", e);
                 self.file = None;
@@ -115,6 +122,7 @@ impl Stats{
         t.respawns = 0;
         t.lifetime_sum = 0;
         t.food_eaten = 0;
+        t.kills = 0;
     }
 
     pub fn step(&self) -> u64{
@@ -135,6 +143,10 @@ impl Stats{
 
     pub fn total_respawns(&self, tribe: usize) -> u32{
         self.tribes[tribe].total_respawns
+    }
+
+    pub fn total_kills(&self, tribe: usize) -> u32{
+        self.tribes[tribe].total_kills
     }
 }
 

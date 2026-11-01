@@ -35,6 +35,7 @@ METRICS = [
     ("in_base", "Agenci we własnej bazie"),
     ("ready_in_base", "Gotowi do rozmnażania w bazie"),
     ("ready", "Wszyscy gotowi do rozmnażania"),
+    ("kills", "Zabójstwa"),
 ]
 FIRST_SEED = 1000
 SMOOTHING_WINDOW = 20

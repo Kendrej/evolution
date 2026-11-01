@@ -117,6 +117,7 @@ fn run_headless(args: &[String]) -> Result<(), String>{
         world.update();
     }
     world.save_final();
+    world.print_ranking();
     Ok(())
 }
 

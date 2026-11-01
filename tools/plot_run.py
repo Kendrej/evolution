@@ -30,6 +30,7 @@ TRIBE_PANELS = [
     ("in_base", "Agenci we własnej bazie", True),
     ("ready_in_base", "Gotowi do rozmnażania w bazie", True),
     ("ready", "Wszyscy gotowi do rozmnażania", True),
+    ("kills", "Zabójstwa", True),
 ]
 
 

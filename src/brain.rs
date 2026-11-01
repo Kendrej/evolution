@@ -1,9 +1,9 @@
 use macroquad::rand::gen_range;
 use std::f32::consts::{PI, TAU};
 
-const INPUTS: usize = 13;
+const INPUTS: usize = 16;
 const HIDDEN: usize = 8;
-const OUTPUTS: usize = 2;
+const OUTPUTS: usize = 3;
 // Kazdy neuron ma wage na kazde wejscie i jedna dodatkowa stala (bias)
 pub const WEIGHT_COUNT: usize = (INPUTS + 1) * HIDDEN + (HIDDEN + 1) * OUTPUTS;
 const MAX_TURN: f32 = 0.1;
@@ -12,7 +12,8 @@ const MUTATION_STRENGTH: f32 = 0.2;
 
 pub struct Action{
     pub turn: f32,
-    pub speed: f32
+    pub speed: f32,
+    pub attack: bool
 }
 
 // Wejscia sieci. Kierunki sa w zakresie od -1 do 1 (ujemne po lewej, 0 na wprost),
@@ -26,6 +27,9 @@ pub struct Senses{
     pub food_distance: f32,
     pub partner_direction: f32,
     pub partner_distance: f32,
+    pub enemy_direction: f32,
+    pub enemy_distance: f32,
+    pub enemy_energy: f32,
     pub tile_here: f32,
     pub capture_progress: f32,
     pub tile_ahead: f32,
@@ -44,6 +48,9 @@ impl Senses{
             self.food_distance,
             self.partner_direction,
             self.partner_distance,
+            self.enemy_direction,
+            self.enemy_distance,
+            self.enemy_energy,
             self.tile_here,
             self.capture_progress,
             self.tile_ahead,
@@ -127,7 +134,8 @@ impl Brain{
 
         Action{
             turn: outputs[0] * MAX_TURN,
-            speed: (outputs[1] + 1.0) / 2.0
+            speed: (outputs[1] + 1.0) / 2.0,
+            attack: outputs[2] > 0.0
         }
     }
 }
@@ -164,6 +172,9 @@ mod tests{
             food_distance: value,
             partner_direction: value,
             partner_distance: value,
+            enemy_direction: value,
+            enemy_distance: value,
+            enemy_energy: value,
             tile_here: value,
             capture_progress: value,
             tile_ahead: value,
@@ -220,7 +231,7 @@ mod tests{
 
     #[test]
     fn network_has_expected_weight_count(){
-        assert_eq!(WEIGHT_COUNT, 130);
+        assert_eq!(WEIGHT_COUNT, 163);
     }
 
     #[test]
@@ -255,10 +266,22 @@ mod tests{
         assert_close(brain.decide(&senses(0.5)).speed, 0.5);
 
         // Bias neuronu wyjsciowego od predkosci
-        let speed_bias = WEIGHT_COUNT - (HIDDEN + 1);
+        let speed_bias = WEIGHT_COUNT - 2 * (HIDDEN + 1);
         brain.weights[speed_bias] = -10.0;
         assert_close(brain.decide(&senses(0.5)).speed, 0.0);
         brain.weights[speed_bias] = 10.0;
         assert_close(brain.decide(&senses(0.5)).speed, 1.0);
+    }
+
+    #[test]
+    fn network_decides_whether_to_attack(){
+        let mut brain = Brain{ weights: [0.0; WEIGHT_COUNT] };
+
+        // Bias neuronu wyjsciowego od ataku
+        let attack_bias = WEIGHT_COUNT - (HIDDEN + 1);
+        brain.weights[attack_bias] = -10.0;
+        assert!(!brain.decide(&senses(0.5)).attack);
+        brain.weights[attack_bias] = 10.0;
+        assert!(brain.decide(&senses(0.5)).attack);
     }
 }

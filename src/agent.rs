@@ -15,6 +15,7 @@ pub struct Agent{
     alive: bool,
     timer_of_death: i32,
     reproduction_cooldown: i32,
+    attack_cooldown: i32,
     age: u32,
     brain: Brain
 }
@@ -25,6 +26,11 @@ const REPRODUCTION_MIN_ENERGY: f32 = 60.0;
 const REPRODUCTION_COST: f32 = 25.0;
 const REPRODUCTION_COOLDOWN: i32 = 600;
 const MAX_AGE: u32 = 15_000;
+const ATTACK_COST: f32 = 1.0;
+const ATTACK_COOLDOWN: i32 = 30;
+const ATTACK_DAMAGE: f32 = 25.0;
+const ATTACK_STOLEN_PART: f32 = 0.5;
+const ATTACK_REACH: f32 = 5.0;
 
 impl Agent{
     fn new(x: f32, y: f32, tribe: usize, energy: f32, tile_size: f32, brain: Brain) -> Agent{
@@ -39,6 +45,7 @@ impl Agent{
             alive: true,
             timer_of_death: 0,
             reproduction_cooldown: REPRODUCTION_COOLDOWN,
+            attack_cooldown: 0,
             age: 0,
             brain
         }
@@ -78,7 +85,39 @@ impl Agent{
 
 
 
-    pub fn update(&mut self, terrain: &Terrain, senses: &Senses){
+    pub fn can_hit(&self, other: &Agent) -> bool{
+        if self.tribe == other.tribe || !self.alive || !other.alive{
+            return false
+        }
+
+        let distance_sq = (self.x - other.x).powi(2) + (self.y - other.y).powi(2);
+        let reach = self.size + other.size + ATTACK_REACH;
+        distance_sq < reach * reach
+    }
+
+    // Atakujacy zabiera czesc odebranej energii. Zwraca true, gdy cel zginal.
+    pub fn hit(&mut self, target: &mut Agent) -> bool{
+        let damage = ATTACK_DAMAGE.min(target.energy);
+        target.energy -= damage;
+        self.energy = (self.energy + damage * ATTACK_STOLEN_PART).min(self.max_energy);
+
+        if target.energy <= 0.0{
+            target.die();
+            return true
+        }
+        false
+    }
+
+    fn die(&mut self){
+        self.energy = 0.0;
+        self.timer_of_death += 1;
+        self.alive = false;
+    }
+
+    // Zwraca true, gdy agent wykonal w tym kroku atak
+    pub fn update(&mut self, terrain: &Terrain, senses: &Senses) -> bool{
+        let mut attacked = false;
+
         if self.alive{
             let action = self.brain.decide(senses);
             self.angle += action.turn;
@@ -99,11 +138,19 @@ impl Agent{
                 self.reproduction_cooldown -= 1;
             }
 
+            if self.attack_cooldown > 0 {
+                self.attack_cooldown -= 1;
+            }
+            else if action.attack {
+                // Pudlo tez kosztuje, zeby nie oplacalo sie atakowac bez przerwy
+                self.energy -= ATTACK_COST;
+                self.attack_cooldown = ATTACK_COOLDOWN;
+                attacked = true;
+            }
+
             self.energy -= 0.05;
             if self.should_die() {
-                self.energy = 0.0;
-                self.timer_of_death += 1;
-                self.alive = false;
+                self.die();
             }
         }
         else {
@@ -117,7 +164,8 @@ impl Agent{
                 self.timer_of_death += 1;
             }
         }
-        
+
+        attacked && self.alive
     }
 
     fn should_die(&self) -> bool{
@@ -222,5 +270,53 @@ mod tests{
         let mut agent = agent();
         agent.energy = 0.0;
         assert!(agent.should_die());
+    }
+
+    #[test]
+    fn hit_moves_part_of_the_energy_to_the_attacker(){
+        let mut attacker = agent();
+        attacker.energy = 50.0;
+        let mut target = agent();
+
+        assert!(!attacker.hit(&mut target));
+        assert_eq!(target.energy, 100.0 - ATTACK_DAMAGE);
+        assert_eq!(attacker.energy, 50.0 + ATTACK_DAMAGE * ATTACK_STOLEN_PART);
+    }
+
+    #[test]
+    fn hit_kills_a_weak_target_and_steals_only_what_it_had(){
+        let mut attacker = agent();
+        attacker.energy = 50.0;
+        let mut target = agent();
+        target.energy = 10.0;
+
+        assert!(attacker.hit(&mut target));
+        assert!(!target.is_alive());
+        assert_eq!(attacker.energy, 50.0 + 10.0 * ATTACK_STOLEN_PART);
+    }
+
+    #[test]
+    fn stolen_energy_does_not_exceed_the_maximum(){
+        let mut attacker = agent();
+        let mut target = agent();
+        attacker.hit(&mut target);
+        assert_eq!(attacker.energy, attacker.max_energy);
+    }
+
+    #[test]
+    fn only_a_close_living_enemy_can_be_hit(){
+        let attacker = agent();
+        let mut enemy = Agent::new(10.0, 0.0, 1, 100.0, 25.0, Brain::new());
+        assert!(attacker.can_hit(&enemy));
+
+        enemy.x = 500.0;
+        assert!(!attacker.can_hit(&enemy));
+
+        enemy.x = 10.0;
+        enemy.die();
+        assert!(!attacker.can_hit(&enemy));
+
+        let friend = Agent::new(10.0, 0.0, 0, 100.0, 25.0, Brain::new());
+        assert!(!attacker.can_hit(&friend));
     }
 }

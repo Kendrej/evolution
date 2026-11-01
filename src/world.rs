@@ -8,8 +8,9 @@ use crate::model::{Model, ModelSaver, format_steps};
 use std::f32::consts::FRAC_PI_2;
 
 const FOOD_SPAWN_ATTEMPTS: usize = 3;
-const FOOD_CHANCE_NEUTRAL: f32 = 0.05;
-const FOOD_CHANCE_OWNED: f32 = 0.15;
+const FOOD_CHANCE_NEUTRAL: f32 = 0.02;
+const FOOD_CHANCE_OWNED: f32 = 0.05;
+const MAX_FOOD: usize = 2000;
 const MAX_AGENTS: usize = 300;
 const MIN_TRIBE_POPULATION: usize = 5;
 const SIMULATION_SPEEDS: [usize; 3] = [1, 10, 50];
@@ -17,6 +18,7 @@ const STATS_BUTTON_WIDTH: f32 = 130.0;
 const STATS_BUTTON_HEIGHT: f32 = 25.0;
 const MODEL_SAVE_INTERVAL: u64 = 50_000;
 const PARENT_POOL_SIZE: usize = 20;
+const KILLER_PARENT_CHANCE: f32 = 0.25;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Mode{
@@ -166,11 +168,22 @@ impl World{
             .map(|(index, a)| ReadyAgent{ index, tribe: a.tribe(), x: a.get_x(), y: a.get_y() })
             .collect();
 
+        let living_agents: Vec<LivingAgent> = self.agents.iter().enumerate()
+            .filter(|(_, a)| a.is_alive())
+            .map(|(index, a)| LivingAgent{ index, tribe: a.tribe(), x: a.get_x(), y: a.get_y(), energy: a.energy_ratio() })
+            .collect();
+        let mut attacks = Vec::new();
+
         for (index, a) in self.agents.iter_mut().enumerate(){
             let was_alive = a.is_alive();
             let partner = nearest_partner(index, a.tribe(), a.get_x(), a.get_y(), &ready_agents);
-            let senses = sense(a, &self.terrain, &self.tribes[a.tribe()], &self.food, partner);
-            a.update(&self.terrain, &senses);
+            let enemy = nearest_enemy(a.tribe(), a.get_x(), a.get_y(), &living_agents);
+            let senses = sense(a, &self.terrain, &self.tribes[a.tribe()], &self.food, partner, enemy);
+            if a.update(&self.terrain, &senses){
+                if let Some(enemy) = enemy{
+                    attacks.push((index, enemy.index));
+                }
+            }
             if a.is_alive(){
                 self.terrain.capture(a.get_x(), a.get_y(), a.tribe());
             }
@@ -179,6 +192,7 @@ impl World{
             }
         }
         self.terrain.update_capture_status();
+        self.resolve_attacks(&attacks);
 
         self.food.retain(|f| !f.eaten);
         self.agents.retain(|a| !a.is_gone());
@@ -191,6 +205,41 @@ impl World{
         if self.stats.step() % MODEL_SAVE_INTERVAL == 0{
             self.save_latest();
         }
+    }
+
+    fn resolve_attacks(&mut self, attacks: &[(usize, usize)]){
+        for &(attacker, target) in attacks{
+            let Ok([attacker, target]) = self.agents.get_disjoint_mut([attacker, target]) else {
+                continue;
+            };
+            if attacker.can_hit(target) && attacker.hit(target){
+                self.stats.add_death(target.tribe(), target.age());
+                self.stats.add_kill(attacker.tribe());
+                // Zabojca czasem przekazuje wagi dalej jak rodzic. Przy kazdym zabojstwie
+                // lista zapelniala sie zabojcami i agenci przestawali sie rozmnazac.
+                if rand::gen_range(0.0, 1.0) < KILLER_PARENT_CHANCE{
+                    remember_parent(&mut self.parents[attacker.tribe()], attacker.brain());
+                }
+            }
+        }
+    }
+
+    // Kolejnosc plemion od najlepszego. Rozstrzygaja zajete pola, a przy remisie liczba zywych.
+    pub fn ranking(&self) -> Vec<usize>{
+        let scores: Vec<(usize, usize)> = (0..self.tribes.len())
+            .map(|tribe| (self.terrain.owned_tiles(tribe), self.alive_in_tribe(tribe)))
+            .collect();
+        rank_tribes(&scores)
+    }
+
+    pub fn print_ranking(&self){
+        for (place, tribe) in self.ranking().into_iter().enumerate(){
+            println!("Miejsce {}: plemie {}, pola {}, zywi {}, zabojstwa {}", place + 1, tribe + 1, self.terrain.owned_tiles(tribe), self.alive_in_tribe(tribe), self.stats.total_kills(tribe));
+        }
+    }
+
+    fn alive_in_tribe(&self, tribe: usize) -> usize{
+        self.agents.iter().filter(|a| a.is_alive() && a.tribe() == tribe).count()
     }
 
     fn to_model(&self) -> Model{
@@ -259,14 +308,13 @@ impl World{
             return;
         }
 
-        draw_rectangle(0.0, STATS_BUTTON_HEIGHT, 520.0, 150.0, panel_color);
+        draw_rectangle(0.0, STATS_BUTTON_HEIGHT, 800.0, 150.0, panel_color);
         draw_text(&format!("Agenci: {}", self.agents.len()), 10.0, 45.0, 20.0, WHITE);
         draw_text(&format!("Jedzenie: {}", self.food.len()), 10.0, 65.0, 20.0, WHITE);
 
-        for (i, tribe) in self.tribes.iter().enumerate(){
-            let alive = self.agents.iter().filter(|a| a.is_alive() && a.tribe() == i).count();
-            let text = format!("Plemie {}: zywi {}, narodziny {}, smierci {}, odrodzenia {}", i + 1, alive, self.stats.total_births(i), self.stats.total_deaths(i), self.stats.total_respawns(i));
-            draw_text(&text, 10.0, 85.0 + i as f32 * 20.0, 20.0, tribe.color());
+        for (place, i) in self.ranking().into_iter().enumerate(){
+            let text = format!("{}. Plemie {}: pola {}, zywi {}, narodziny {}, smierci {}, odrodzenia {}, zabojstwa {}", place + 1, i + 1, self.terrain.owned_tiles(i), self.alive_in_tribe(i), self.stats.total_births(i), self.stats.total_deaths(i), self.stats.total_respawns(i), self.stats.total_kills(i));
+            draw_text(&text, 10.0, 85.0 + place as f32 * 20.0, 20.0, self.tribes[i].color());
         }
 
         draw_text(&format!("Ziarno: {}", self.stats.seed()), 10.0, 165.0, 20.0, WHITE);
@@ -348,6 +396,10 @@ impl World{
     }
 
     fn spawn_food(&mut self){
+        if self.food.len() >= MAX_FOOD{
+            return;
+        }
+
         for _ in 0..FOOD_SPAWN_ATTEMPTS{
             if let Some((x, y)) = Food::random_free_spot(&self.terrain, &self.food){
                 let chance = if self.terrain.owner_at(x, y).is_some(){
@@ -403,7 +455,28 @@ fn nearest_partner(index: usize, tribe: usize, x: f32, y: f32, ready_agents: &[R
         .min_by(|a, b| distance_sq(a).total_cmp(&distance_sq(b)))
 }
 
-fn sense(agent: &Agent, terrain: &Terrain, tribe: &Tribe, food: &[Food], partner: Option<&ReadyAgent>) -> Senses{
+struct LivingAgent{
+    index: usize,
+    tribe: usize,
+    x: f32,
+    y: f32,
+    energy: f32
+}
+
+fn nearest_enemy(tribe: usize, x: f32, y: f32, living_agents: &[LivingAgent]) -> Option<&LivingAgent>{
+    let distance_sq = |other: &LivingAgent| (other.x - x).powi(2) + (other.y - y).powi(2);
+    living_agents.iter()
+        .filter(|other| other.tribe != tribe)
+        .min_by(|a, b| distance_sq(a).total_cmp(&distance_sq(b)))
+}
+
+fn rank_tribes(scores: &[(usize, usize)]) -> Vec<usize>{
+    let mut tribes: Vec<usize> = (0..scores.len()).collect();
+    tribes.sort_by_key(|&tribe| std::cmp::Reverse(scores[tribe]));
+    tribes
+}
+
+fn sense(agent: &Agent, terrain: &Terrain, tribe: &Tribe, food: &[Food], partner: Option<&ReadyAgent>, enemy: Option<&LivingAgent>) -> Senses{
     let (x, y) = (agent.get_x(), agent.get_y());
     let angle = agent.angle();
     let tribe_id = agent.tribe();
@@ -434,6 +507,11 @@ fn sense(agent: &Agent, terrain: &Terrain, tribe: &Tribe, food: &[Food], partner
         None => (0.0, 1.0)
     };
 
+    let (enemy_direction, enemy_distance, enemy_energy) = match enemy{
+        Some(e) => (relative_direction(x, y, angle, e.x, e.y), ((e.x - x).powi(2) + (e.y - y).powi(2)).sqrt() / max_distance, e.energy),
+        None => (0.0, 1.0, 0.0)
+    };
+
     let tile_at_angle = |a: f32| terrain.tile_sense(x + tile_size * a.cos(), y + tile_size * a.sin(), tribe_id);
 
     Senses{
@@ -445,6 +523,9 @@ fn sense(agent: &Agent, terrain: &Terrain, tribe: &Tribe, food: &[Food], partner
         food_distance,
         partner_direction,
         partner_distance,
+        enemy_direction,
+        enemy_distance,
+        enemy_energy,
         tile_here: terrain.tile_sense(x, y, tribe_id),
         capture_progress: terrain.capture_progress_at(x, y, tribe_id),
         tile_ahead: tile_at_angle(angle),
@@ -527,5 +608,23 @@ mod tests{
     fn other_tribes_are_not_partners(){
         let agents = [ready(1, 1, 10.0)];
         assert!(nearest_partner(0, 0, 0.0, 0.0, &agents).is_none());
+    }
+
+    #[test]
+    fn nearest_enemy_is_the_closest_one_from_another_tribe(){
+        let living = |index, tribe, x| LivingAgent{ index, tribe, x, y: 0.0, energy: 1.0 };
+        let agents = [living(1, 0, 1.0), living(2, 1, 50.0), living(3, 2, 20.0)];
+        assert_eq!(nearest_enemy(0, 0.0, 0.0, &agents).unwrap().index, 3);
+    }
+
+    #[test]
+    fn tribe_without_enemies_sees_nobody(){
+        let agents = [LivingAgent{ index: 1, tribe: 0, x: 1.0, y: 0.0, energy: 1.0 }];
+        assert!(nearest_enemy(0, 0.0, 0.0, &agents).is_none());
+    }
+
+    #[test]
+    fn ranking_prefers_tiles_and_breaks_ties_with_living_agents(){
+        assert_eq!(rank_tribes(&[(10, 5), (30, 1), (10, 8), (0, 20)]), vec![1, 2, 0, 3]);
     }
 }

@@ -30,7 +30,9 @@ Symulacja plemion w Ruście (macroquad). Celem jest neuroewolucja: każdy agent 
 ## Stan projektu
 Zrobione: statystyki i zapis do CSV, losowa mapa, minimalna populacja plemienia, przyspieszenie, struktura `Brain` i `Action`, zmysły agenta `Senses`, wykresy z plików CSV.
 
-`Brain` to sieć neuronowa z 13 wejściami, 8 neuronami ukrytymi i 2 wyjściami (130 wag). `Senses` zawiera kierunek i odległość do najbliższego gotowego partnera z plemienia.
+`Brain` to sieć neuronowa z 16 wejściami, 8 neuronami ukrytymi i 3 wyjściami (163 wagi). `Senses` zawiera kierunek i odległość do najbliższego gotowego partnera z plemienia oraz kierunek, odległość i energię najbliższego wroga. Modele zapisane przed dodaniem walki się nie wczytają.
+
+Walka: trzecie wyjście sieci to atak na najbliższego wroga w zasięgu, można go użyć co 30 kroków i kosztuje 1 energii także przy pudle. Trafienie zabiera 25 energii, a połowa trafia do atakującego. Zabójca trafia na listę rodziców z szansą 25%. Wolno atakować także w cudzej bazie. Ranking plemion liczy zajęte pola, a przy remisie żywych. Jest w panelu statystyk i na końcu przebiegu bez okna, ale rund jeszcze nie ma, a `MIN_TRIBE_POPULATION` nadal nie pozwala plemieniu wymrzeć.
 
 Dzieci dziedziczą wagi po rodzicach z mutacją. W treningu odrodzeni agenci dostają wagi z listy 20 ostatnich rodziców swojego plemienia, z mutacją, a przy pustej liście nową, losową sieć. Lista jest zapisywana w modelu.
 
@@ -42,7 +44,11 @@ Pomiar `in_base` i `ready_in_base` (średnio na plemię, ostatnie 100 000 krokó
 
 Długi test, 5 ziaren po 2 000 000 kroków (`runs/comparisons/2026-11-01_10-23_dlugi_test/`), pokazał uczenie: w ostatnich 500 000 kroków narodziny wynoszą 6914 z listą rodziców i 609 bez dziedziczenia, odrodzenia 3551 i 6330, a żywi na plemię 13,4 i 5,1. Bez dziedziczenia nic się nie zmienia w czasie. Narodziny przegoniły odrodzenia w sumie, ale nie na ziarnie 1004, a wzrost zwalnia. Gotowych jest 8,4 na plemię, z czego w bazie tylko 0,44, więc gotowy agent rozmnaża się średnio raz na około 6000 kroków, choć przerwa trwa 600. Zajęte pola są na końcu podobne w obu trybach (721 i 795 na plemię), więc wcześniejszy spadek był przejściowy.
 
+Limit wieku 15 000 kroków (`runs/comparisons/2026-11-01_16-54_limit_wieku/`, ostatnie 500 000 kroków): narodziny 7699 wobec 6914 bez limitu, odrodzenia 6253 wobec 3551, żywi na plemię 8,5 wobec 13,4.
+
+Walka i mniej jedzenia (`runs/comparisons/2026-11-01_18-40_walka_dlugi/`, ostatnie 500 000 kroków): narodziny 1853 przy dziedziczeniu i 137 bez niego, odrodzenia 19341 i 20105, zabójstwa 1112 i 346. Populacja stoi na minimum (5,1 na plemię), a 1052 z 1112 zabójstw pochodzi z 2 ziaren. Narodziny są ponad 4 razy niższe niż przed walką.
+
 ## Następne kroki
-1. Limit wieku agenta (np. 15 000 kroków), żeby szybciej wymieniać pokolenia i mocniej nagradzać powrót do bazy. Sprawdzić na tych samych ziarnach przez 2 000 000 kroków.
-2. Koszt energii za ruch i strojenie. Dobry znak to rosnące narodziny przy spadających odrodzeniach.
-3. Sprawdzenie, czy przejmowanie pól jest celowe. Pola zajmują też losowe sieci, więc samo `owned_tiles` tego nie rozstrzyga.
+1. Strojenie walki i jedzenia, żeby populacja rosła ponad minimum. Warto najpierw zmierzyć, jak często agenci atakują i pudłują.
+2. Rundy: wymieranie plemion, koniec po wybiciu albo limicie kroków, ranking przekazujący wagi dalej i zachowywanie najlepszych modeli.
+3. Cechy agentów dopiero po działających rundach.
