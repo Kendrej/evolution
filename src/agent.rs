@@ -24,6 +24,7 @@ const TIME_OF_DISAPPEARING: f32 = 300.0;
 const REPRODUCTION_MIN_ENERGY: f32 = 60.0;
 const REPRODUCTION_COST: f32 = 25.0;
 const REPRODUCTION_COOLDOWN: i32 = 600;
+const MAX_AGE: u32 = 15_000;
 
 impl Agent{
     fn new(x: f32, y: f32, tribe: usize, energy: f32, tile_size: f32, brain: Brain) -> Agent{
@@ -99,7 +100,7 @@ impl Agent{
             }
 
             self.energy -= 0.05;
-            if self.energy <= 0.0 {
+            if self.should_die() {
                 self.energy = 0.0;
                 self.timer_of_death += 1;
                 self.alive = false;
@@ -117,6 +118,10 @@ impl Agent{
             }
         }
         
+    }
+
+    fn should_die(&self) -> bool{
+        self.energy <= 0.0 || self.age >= MAX_AGE
     }
 
     pub fn draw(&self, color: Color){
@@ -187,5 +192,35 @@ impl Agent{
 
     pub fn is_alive(&self) -> bool{
         self.alive
+    }
+}
+
+#[cfg(test)]
+mod tests{
+    use super::*;
+
+    fn agent() -> Agent{
+        Agent::new(0.0, 0.0, 0, 100.0, 25.0, Brain::new())
+    }
+
+    #[test]
+    fn agent_with_energy_below_the_age_limit_survives(){
+        let mut agent = agent();
+        agent.age = MAX_AGE - 1;
+        assert!(!agent.should_die());
+    }
+
+    #[test]
+    fn agent_dies_at_the_age_limit(){
+        let mut agent = agent();
+        agent.age = MAX_AGE;
+        assert!(agent.should_die());
+    }
+
+    #[test]
+    fn agent_without_energy_dies(){
+        let mut agent = agent();
+        agent.energy = 0.0;
+        assert!(agent.should_die());
     }
 }
