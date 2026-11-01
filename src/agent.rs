@@ -26,11 +26,12 @@ const REPRODUCTION_MIN_ENERGY: f32 = 60.0;
 const REPRODUCTION_COST: f32 = 25.0;
 const REPRODUCTION_COOLDOWN: i32 = 600;
 const MAX_AGE: u32 = 15_000;
-const ATTACK_COST: f32 = 1.0;
+const ATTACK_COST: f32 = 0.25;
 const ATTACK_COOLDOWN: i32 = 30;
 const ATTACK_DAMAGE: f32 = 25.0;
 const ATTACK_STOLEN_PART: f32 = 0.5;
 const ATTACK_REACH: f32 = 5.0;
+const FOOD_ENERGY_PER_SIZE: f32 = 8.0;
 
 impl Agent{
     fn new(x: f32, y: f32, tribe: usize, energy: f32, tile_size: f32, brain: Brain) -> Agent{
@@ -66,7 +67,8 @@ impl Agent{
             return false
         }
 
-        if !terrain.is_base_of(self.x, self.y, self.tribe) || !terrain.is_base_of(other.x, other.y, other.tribe){
+        // Baza nalezy do plemienia na stale, wiec tez sie tu liczy
+        if terrain.owner_at(self.x, self.y) != Some(self.tribe) || terrain.owner_at(other.x, other.y) != Some(other.tribe){
             return false
         }
 
@@ -193,8 +195,8 @@ impl Agent{
             self.size = new_size;
         }
 
-        if self.energy + food_size * 5.0 <= self.max_energy {
-            self.energy += food_size * 5.0;
+        if self.energy + food_size * FOOD_ENERGY_PER_SIZE <= self.max_energy {
+            self.energy += food_size * FOOD_ENERGY_PER_SIZE;
         }
         else {
             self.energy = self.max_energy;
@@ -270,6 +272,32 @@ mod tests{
         let mut agent = agent();
         agent.energy = 0.0;
         assert!(agent.should_die());
+    }
+
+    fn ready_pair_at(x: f32, y: f32, tribe: usize) -> (Agent, Agent){
+        let mut first = Agent::new(x, y, tribe, 100.0, 25.0, Brain::new());
+        let mut second = Agent::new(x, y, tribe, 100.0, 25.0, Brain::new());
+        first.reproduction_cooldown = 0;
+        second.reproduction_cooldown = 0;
+        (first, second)
+    }
+
+    #[test]
+    fn agents_reproduce_only_on_tiles_of_their_tribe(){
+        let mut terrain = Terrain::new(20, 20, 25.0, 3, 1);
+        let (first, second) = ready_pair_at(30.0, 30.0, 0);
+        assert!(first.can_reproduce_with(&second, &terrain));
+
+        let (first, second) = ready_pair_at(30.0, 30.0, 1);
+        assert!(!first.can_reproduce_with(&second, &terrain));
+
+        let (x, y) = (250.0, 250.0);
+        let (first, second) = ready_pair_at(x, y, 0);
+        assert_eq!(terrain.owner_at(x, y), None);
+        assert!(!first.can_reproduce_with(&second, &terrain));
+
+        terrain.set_owner(x, y, 0);
+        assert!(first.can_reproduce_with(&second, &terrain));
     }
 
     #[test]

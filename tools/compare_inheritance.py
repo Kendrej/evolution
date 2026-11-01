@@ -36,6 +36,8 @@ METRICS = [
     ("ready_in_base", "Gotowi do rozmnażania w bazie"),
     ("ready", "Wszyscy gotowi do rozmnażania"),
     ("kills", "Zabójstwa"),
+    ("attacks", "Ataki"),
+    ("hits", "Trafienia"),
 ]
 FIRST_SEED = 1000
 SMOOTHING_WINDOW = 20
@@ -107,7 +109,7 @@ def main():
         mode_paths = [path for job, path in zip(jobs, paths) if job[2] == mode]
         results[mode] = average_runs(mode_paths)
 
-    figure, axes = plt.subplots(5, 2, figsize=(14, 17), sharex=True)
+    figure, axes = plt.subplots(6, 2, figsize=(14, 20), sharex=True)
     for axis, (name, title) in zip(axes.flatten(), METRICS):
         for mode in MODES:
             steps, values = results[mode]

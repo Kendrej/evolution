@@ -11,7 +11,7 @@ Symulacja plemion w Ruście (macroquad). Celem jest neuroewolucja: każdy agent 
 
 ## Założenia
 - Teraz liczy się dobra podstawa pod sieć, a nie dopracowane zachowanie. Decyzje agentów mają dać się łatwo zastąpić siecią.
-- Agenci rozmnażają się tylko wtedy, gdy dwaj z tego samego plemienia dotkną się we własnej bazie. Sieć ma się nauczyć tam wracać, więc nie dodajemy ręcznego powrotu do bazy.
+- Agenci rozmnażają się, gdy dwaj z tego samego plemienia dotkną się na polu należącym do plemienia, także w bazie. Baza nie jest już do tego konieczna, więc poza odradzaniem ma małe znaczenie i trzeba do niej wrócić w koncepcji.
 - W bazach nie ma jedzenia. Jedzenie z pola zajętego może zjeść tylko właściciel, a z neutralnego każdy.
 
 ## Uruchamianie
@@ -32,7 +32,7 @@ Zrobione: statystyki i zapis do CSV, losowa mapa, minimalna populacja plemienia,
 
 `Brain` to sieć neuronowa z 16 wejściami, 8 neuronami ukrytymi i 3 wyjściami (163 wagi). `Senses` zawiera kierunek i odległość do najbliższego gotowego partnera z plemienia oraz kierunek, odległość i energię najbliższego wroga. Modele zapisane przed dodaniem walki się nie wczytają.
 
-Walka: trzecie wyjście sieci to atak na najbliższego wroga w zasięgu, można go użyć co 30 kroków i kosztuje 1 energii także przy pudle. Trafienie zabiera 25 energii, a połowa trafia do atakującego. Zabójca trafia na listę rodziców z szansą 25%. Wolno atakować także w cudzej bazie. Ranking plemion liczy zajęte pola, a przy remisie żywych. Jest w panelu statystyk i na końcu przebiegu bez okna, ale rund jeszcze nie ma, a `MIN_TRIBE_POPULATION` nadal nie pozwala plemieniu wymrzeć.
+Walka: trzecie wyjście sieci to atak na najbliższego wroga w zasięgu, można go użyć co 30 kroków i kosztuje 0,25 energii także przy pudle. Trafienie zabiera 25 energii, a połowa trafia do atakującego. Zabójca trafia na listę rodziców z szansą 25%. Wolno atakować także w cudzej bazie. Ranking plemion liczy zajęte pola, a przy remisie żywych. Jest w panelu statystyk i na końcu przebiegu bez okna, ale rund jeszcze nie ma, a `MIN_TRIBE_POPULATION` nadal nie pozwala plemieniu wymrzeć.
 
 Dzieci dziedziczą wagi po rodzicach z mutacją. W treningu odrodzeni agenci dostają wagi z listy 20 ostatnich rodziców swojego plemienia, z mutacją, a przy pustej liście nową, losową sieć. Lista jest zapisywana w modelu.
 
@@ -48,7 +48,11 @@ Limit wieku 15 000 kroków (`runs/comparisons/2026-11-01_16-54_limit_wieku/`, os
 
 Walka i mniej jedzenia (`runs/comparisons/2026-11-01_18-40_walka_dlugi/`, ostatnie 500 000 kroków): narodziny 1853 przy dziedziczeniu i 137 bez niego, odrodzenia 19341 i 20105, zabójstwa 1112 i 346. Populacja stoi na minimum (5,1 na plemię), a 1052 z 1112 zabójstw pochodzi z 2 ziaren. Narodziny są ponad 4 razy niższe niż przed walką.
 
+Strojenie (5 ziaren po 2 000 000 kroków, ostatnie 500 000 kroków). Koszt ataku 0,25 i jedzenie dające 40 energii (`2026-11-01_20-26_dlugi_d_prog60`, obecne ustawienia): narodziny 2488 wobec 348 bez dziedziczenia, odrodzenia 12307 i 14036, zabójstwa 543 i 478, żywi na plemię 5,3. Gotowych jest 9,2 z 21 żywych, ale w bazie tylko 0,77 w sumie, więc ograniczeniem jest teraz powrót do bazy, a nie energia. Próg rozmnażania 70 energii (`2026-11-01_20-09_dlugi_e_prog70`): zabójstwa 1736 wobec 488, ale narodziny tylko 593. Około 0,4% ataków trafia, więc agenci atakują prawie na ślepo. Przy limicie jedzenia poniżej 2000 agenci głodują, a 3000 nic nie zmienia.
+
+Rozmnażanie na własnych polach (`2026-11-01_20-52_dlugi_wlasne_pola`, ostatnie 500 000 kroków): narodziny 26513 wobec 1451 bez dziedziczenia, odrodzenia 8296 i 13701, zabójstwa 2325 i 515, żywi na plemię 14,5 i 5,1. Narodziny przewyższają odrodzenia na każdym ziarnie, ale ich wzrost prawie stanął w ostatnim okresie. Na końcu jedno plemię często dominuje (np. 2792 pola wobec 45), a bez dziedziczenia zwykle są wyrównane. Trafia około 1% ataków.
+
 ## Następne kroki
-1. Strojenie walki i jedzenia, żeby populacja rosła ponad minimum. Warto najpierw zmierzyć, jak często agenci atakują i pudłują.
+1. Rola bazy: poza odradzaniem ma małe znaczenie i trzeba ją przemyśleć.
 2. Rundy: wymieranie plemion, koniec po wybiciu albo limicie kroków, ranking przekazujący wagi dalej i zachowywanie najlepszych modeli.
 3. Cechy agentów dopiero po działających rundach.

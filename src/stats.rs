@@ -15,6 +15,8 @@ struct TribeStats{
     total_respawns: u32,
     total_kills: u32,
     kills: u32,
+    attacks: u32,
+    hits: u32,
     births: u32,
     deaths: u32,
     respawns: u32,
@@ -54,7 +56,7 @@ impl Stats{
             .and_then(|_| File::create(&path))
             .and_then(|file| {
                 let mut writer = BufWriter::new(file);
-                writeln!(writer, "step,tribe,alive,births,deaths,respawns,avg_lifetime,food_eaten,owned_tiles,in_base,ready_in_base,ready,kills")?;
+                writeln!(writer, "step,tribe,alive,births,deaths,respawns,avg_lifetime,food_eaten,owned_tiles,in_base,ready_in_base,ready,kills,attacks,hits")?;
                 writer.flush()?;
                 Ok(writer)
             });
@@ -92,6 +94,14 @@ impl Stats{
         self.tribes[tribe].kills += 1;
     }
 
+    pub fn add_attack(&mut self, tribe: usize){
+        self.tribes[tribe].attacks += 1;
+    }
+
+    pub fn add_hit(&mut self, tribe: usize){
+        self.tribes[tribe].hits += 1;
+    }
+
     pub fn add_food(&mut self, tribe: usize){
         self.tribes[tribe].food_eaten += 1;
     }
@@ -110,7 +120,7 @@ impl Stats{
         };
 
         if let Some(file) = &mut self.file{
-            let row = format!("{},{},{},{},{},{},{:.1},{},{},{},{},{},{}", self.step, tribe, alive, t.births, t.deaths, t.respawns, avg_lifetime, t.food_eaten, owned_tiles, in_base, ready_in_base, ready, t.kills);
+            let row = format!("{},{},{},{},{},{},{:.1},{},{},{},{},{},{},{},{}", self.step, tribe, alive, t.births, t.deaths, t.respawns, avg_lifetime, t.food_eaten, owned_tiles, in_base, ready_in_base, ready, t.kills, t.attacks, t.hits);
             if let Err(e) = writeln!(file, "{}", row).and_then(|_| file.flush()){
                 eprintln!("Nie udalo sie zapisac statystyk: {}", e);
                 self.file = None;
@@ -123,6 +133,8 @@ impl Stats{
         t.lifetime_sum = 0;
         t.food_eaten = 0;
         t.kills = 0;
+        t.attacks = 0;
+        t.hits = 0;
     }
 
     pub fn step(&self) -> u64{

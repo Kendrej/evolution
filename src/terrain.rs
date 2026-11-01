@@ -251,6 +251,14 @@ impl Terrain{
         self.tiles[row][col].owner
     }
 
+    #[cfg(test)]
+    pub fn set_owner(&mut self, x: f32, y: f32, tribe: usize){
+        let row = (y / self.config.tile_size) as usize;
+        let col = (x / self.config.tile_size) as usize;
+
+        self.tiles[row][col].owner = Some(tribe);
+    }
+
     pub fn can_walk(&self, x: f32, y: f32, radius: f32) -> bool {
         self.is_walkable_at(x - radius, y)
         && self.is_walkable_at(x + radius, y)

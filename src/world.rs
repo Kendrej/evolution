@@ -212,7 +212,12 @@ impl World{
             let Ok([attacker, target]) = self.agents.get_disjoint_mut([attacker, target]) else {
                 continue;
             };
-            if attacker.can_hit(target) && attacker.hit(target){
+            self.stats.add_attack(attacker.tribe());
+            if !attacker.can_hit(target){
+                continue;
+            }
+            self.stats.add_hit(attacker.tribe());
+            if attacker.hit(target){
                 self.stats.add_death(target.tribe(), target.age());
                 self.stats.add_kill(attacker.tribe());
                 // Zabojca czasem przekazuje wagi dalej jak rodzic. Przy kazdym zabojstwie
