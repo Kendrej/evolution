@@ -7,9 +7,10 @@ mod stats;
 mod brain;
 mod model;
 mod menu;
-use world::{Mode, World};
-use model::ModelStore;
+use world::{Mode, ROUND_STEPS, World};
+use model::{Model, ModelStore};
 use menu::Choice;
+use std::path::Path;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -97,10 +98,15 @@ async fn run_simulation(choice: Choice, store: &ModelStore) -> bool {
     }
 }
 
-// Przebieg bez okna do porownan: --headless <ziarno> <kroki> <inherit|random>
+// Przebieg bez okna do porownan: --headless <ziarno> <kroki> <inherit|random> [kroki_rundy, 0 to bez rund]
 fn run_headless(args: &[String]) -> Result<(), String>{
-    let [seed, steps, mode] = args else {
-        return Err("Uzycie: --headless <ziarno> <kroki> <inherit|random>".to_string());
+    let [seed, steps, mode, round_steps @ ..] = args else {
+        return Err("Uzycie: --headless <ziarno> <kroki> <inherit|random> [kroki_rundy]".to_string());
+    };
+    let round_steps: u64 = match round_steps{
+        [] => ROUND_STEPS,
+        [value] => value.parse().map_err(|_| format!("Bledne kroki rundy: {}", value))?,
+        _ => return Err("Za duzo argumentow".to_string())
     };
     let seed: u32 = seed.parse().map_err(|_| format!("Bledne ziarno: {}", seed))?;
     let steps: u64 = steps.parse().map_err(|_| format!("Bledna liczba krokow: {}", steps))?;
@@ -112,7 +118,11 @@ fn run_headless(args: &[String]) -> Result<(), String>{
 
     rand::srand(seed as u64);
     let saver = mode.name().map(|name| ModelStore::new().comparison(seed, name));
+    if let Some(saver) = &saver{
+        println!("Model: {}", saver.final_path().display());
+    }
     let mut world = World::new(40, 100, seed, mode, None, saver, true);
+    world.set_round_steps(round_steps);
     for _ in 0..steps{
         world.update();
     }
@@ -121,11 +131,37 @@ fn run_headless(args: &[String]) -> Result<(), String>{
     Ok(())
 }
 
+// Mecz bez nauki: --match <model_1> <model_2> <ziarno> <kroki>. Plemiona 1 i 2 to pierwszy model, 3 i 4 drugi.
+fn run_match(args: &[String]) -> Result<(), String>{
+    let [first, second, seed, steps] = args else {
+        return Err("Uzycie: --match <model_1> <model_2> <ziarno> <kroki>".to_string());
+    };
+    let seed: u32 = seed.parse().map_err(|_| format!("Bledne ziarno: {}", seed))?;
+    let steps: u64 = steps.parse().map_err(|_| format!("Bledna liczba krokow: {}", steps))?;
+    let first = Model::load(Path::new(first))?;
+    let second = Model::load(Path::new(second))?;
+
+    rand::srand(seed as u64);
+    let duel = Model::for_match(&first, &second);
+    let mut world = World::new(40, 100, seed, Mode::Demo, Some(duel), None, true);
+    for _ in 0..steps{
+        world.update();
+    }
+    world.print_ranking();
+    Ok(())
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
-    if args.first().is_some_and(|arg| arg == "--headless"){
-        if let Err(message) = run_headless(&args[1..]){
+    let result = match args.first().map(String::as_str){
+        Some("--headless") => Some(run_headless(&args[1..])),
+        Some("--match") => Some(run_match(&args[1..])),
+        _ => None
+    };
+
+    if let Some(result) = result{
+        if let Err(message) = result{
             eprintln!("{}", message);
             std::process::exit(1);
         }

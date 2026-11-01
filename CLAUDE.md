@@ -15,7 +15,7 @@ Symulacja plemion w Ruście (macroquad). Celem jest neuroewolucja: każdy agent 
 - W bazach nie ma jedzenia. Jedzenie z pola zajętego może zjeść tylko właściciel, a z neutralnego każdy.
 
 ## Uruchamianie
-- `cargo run --release` do dłuższych przebiegów. Spacja zmienia prędkość symulacji (x1, x10, x50).
+- `cargo run --release` do dłuższych przebiegów. Spacja zmienia prędkość symulacji (x1, x10, x50, x100).
 - Po starcie menu pozwala wybrać trening (nowa populacja albo zapisany model) lub demo (oglądanie modelu bez nauki i bez zapisu). Esc w trakcie, po potwierdzeniu, wraca do menu.
 - Modele to wagi żywych agentów z podziałem na plemiona, zapisywane co 50 000 kroków. Każda nazwana populacja ma folder `models/<czas>_seed_<ziarno>_<tryb>/`, a kontynuacja treningu zapisuje do tego samego folderu.
 - Gwiazdka w menu oznacza model główny. Jego kopia to `models/main.json`, jedyny model w gicie, aktualizowany przy każdym zapisie tej populacji. Foldery populacji są poza repozytorium.
@@ -26,13 +26,17 @@ Symulacja plemion w Ruście (macroquad). Celem jest neuroewolucja: każdy agent 
   - `runs/comparisons/` zawiera porównania. Każde ma folder `<data>_<opis>/` z plikami CSV, `wykres.png` i `wyniki.txt`.
 - `python tools/plot_run.py` ręcznie rysuje wykresy ostatniego treningu i zapisuje PNG obok pliku CSV. Wymaga `matplotlib`.
 - `python tools/compare_inheritance.py <kroki> <liczba_ziaren> <opis>` uruchamia porównanie.
+- `python tools/compare_rounds.py <kroki> <liczba_ziaren> <opis>` trenuje warianty długości rundy i ciągły świat, a potem wystawia ich modele w meczach bez nauki.
+- Bez okna: `--headless <ziarno> <kroki> <inherit|random> [kroki_rundy, 0 to bez rund]` oraz `--match <model_1> <model_2> <ziarno> <kroki>`.
 
 ## Stan projektu
 Zrobione: statystyki i zapis do CSV, losowa mapa, minimalna populacja plemienia, przyspieszenie, struktura `Brain` i `Action`, zmysły agenta `Senses`, wykresy z plików CSV.
 
 `Brain` to sieć neuronowa z 16 wejściami, 8 neuronami ukrytymi i 3 wyjściami (163 wagi). `Senses` zawiera kierunek i odległość do najbliższego gotowego partnera z plemienia oraz kierunek, odległość i energię najbliższego wroga. Modele zapisane przed dodaniem walki się nie wczytają.
 
-Walka: trzecie wyjście sieci to atak na najbliższego wroga w zasięgu, można go użyć co 30 kroków i kosztuje 0,25 energii także przy pudle. Trafienie zabiera 25 energii, a połowa trafia do atakującego. Zabójca trafia na listę rodziców z szansą 25%. Wolno atakować także w cudzej bazie. Ranking plemion liczy zajęte pola, a przy remisie żywych. Jest w panelu statystyk i na końcu przebiegu bez okna, ale rund jeszcze nie ma, a `MIN_TRIBE_POPULATION` nadal nie pozwala plemieniu wymrzeć.
+Walka: trzecie wyjście sieci to atak na najbliższego wroga w zasięgu, można go użyć co 30 kroków i kosztuje 0,25 energii także przy pudle. Trafienie zabiera 25 energii, a połowa trafia do atakującego. Zabójca trafia na listę rodziców z szansą 25%. Wolno atakować także w cudzej bazie. Ranking plemion liczy zajęte pola, a przy remisie żywych. Jest w panelu statystyk i na końcu przebiegu bez okna. `MIN_TRIBE_POPULATION` nadal nie pozwala plemieniu wymrzeć.
+
+Rundy: co 50 000 kroków (poza demo) powstaje nowa mapa i nowe jedzenie, a każde plemię zaczyna od 10 agentów w bazie. Wagi bierze z listy rodziców i żywych swojego plemienia, z mutacją, ale ostatnie w rankingu dostaje wagi i listę rodziców zwycięzcy. W CSV `owned_tiles` i `alive` spadają więc na początku każdej rundy.
 
 Dzieci dziedziczą wagi po rodzicach z mutacją. W treningu odrodzeni agenci dostają wagi z listy 20 ostatnich rodziców swojego plemienia, z mutacją, a przy pustej liście nową, losową sieć. Lista jest zapisywana w modelu.
 
@@ -52,7 +56,9 @@ Strojenie (5 ziaren po 2 000 000 kroków, ostatnie 500 000 kroków). Koszt ataku
 
 Rozmnażanie na własnych polach (`2026-11-01_20-52_dlugi_wlasne_pola`, ostatnie 500 000 kroków): narodziny 26513 wobec 1451 bez dziedziczenia, odrodzenia 8296 i 13701, zabójstwa 2325 i 515, żywi na plemię 14,5 i 5,1. Narodziny przewyższają odrodzenia na każdym ziarnie, ale ich wzrost prawie stanął w ostatnim okresie. Na końcu jedno plemię często dominuje (np. 2792 pola wobec 45), a bez dziedziczenia zwykle są wyrównane. Trafia około 1% ataków.
 
+Rundy wobec ciągłego świata (`2026-11-01_22-23_rundy_dlugi`, 5 ziaren po 2 000 000 kroków, potem mecze po 100 000 kroków w obie strony na 3 nowych mapach): rundy 50 000 wygrały 15/15 (pola 69018 wobec 17450), 100 000 i 200 000 po 12/15, oba przegrywając na ziarnie 1001. Mecz przypomina start rundy, więc format sprzyja modelom z rund. Około 1% ataków nadal trafia.
+
 ## Następne kroki
 1. Rola bazy: poza odradzaniem ma małe znaczenie i trzeba ją przemyśleć.
-2. Rundy: wymieranie plemion, koniec po wybiciu albo limicie kroków, ranking przekazujący wagi dalej i zachowywanie najlepszych modeli.
+2. Wymieranie plemion z końcem rundy po wybiciu rywali i zachowywanie najlepszych modeli.
 3. Cechy agentów dopiero po działających rundach.

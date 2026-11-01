@@ -13,12 +13,17 @@ const FOOD_CHANCE_OWNED: f32 = 0.05;
 const MAX_FOOD: usize = 2000;
 const MAX_AGENTS: usize = 300;
 const MIN_TRIBE_POPULATION: usize = 5;
-const SIMULATION_SPEEDS: [usize; 3] = [1, 10, 50];
+const SIMULATION_SPEEDS: [usize; 4] = [1, 10, 50, 100];
 const STATS_BUTTON_WIDTH: f32 = 130.0;
 const STATS_BUTTON_HEIGHT: f32 = 25.0;
 const MODEL_SAVE_INTERVAL: u64 = 50_000;
 const PARENT_POOL_SIZE: usize = 20;
 const KILLER_PARENT_CHANCE: f32 = 0.25;
+pub const ROUND_STEPS: u64 = 50_000;
+const MAP_ROWS: usize = 60;
+const MAP_COLS: usize = 60;
+const TILE_SIZE: f32 = 25.0;
+const BASE_SIZE: usize = 5;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Mode{
@@ -68,18 +73,16 @@ pub struct World{
     parents: Vec<Vec<Brain>>,
     saver: Option<ModelSaver>,
     seed: u32,
-    start_step: u64
+    start_step: u64,
+    start_agents: usize,
+    start_food: usize,
+    round_steps: u64
 }
 
 impl World{
     pub fn new(num_agents: usize, num_food: usize, seed: u32, mode: Mode, model: Option<Model>, saver: Option<ModelSaver>, is_comparison: bool) -> World{
         let mut agents = Vec::new();
-        let mut food = Vec::new();
-        let rows = 60;
-        let cols = 60;
-        let tile_size = 25.0;
-        let base_size = 5;
-        let terrain = Terrain::new(rows, cols, tile_size, base_size, seed);
+        let terrain = Terrain::new(MAP_ROWS, MAP_COLS, TILE_SIZE, BASE_SIZE, seed);
         let tribes = Tribe::create_tribes(terrain.config());
         let stats = Stats::new(seed, tribes.len(), mode.name(), is_comparison);
         let height = terrain.height();
@@ -110,14 +113,7 @@ impl World{
             }
         }
 
-        for _ in 0..num_food * 10{
-            if food.len() >= num_food{
-                break;
-            }
-            if let Some((x, y)) = Food::random_free_spot(&terrain, &food){
-                food.push(Food::new(x, y));
-            }
-        }
+        let food = starting_food(&terrain, num_food);
 
         World{
             agents,
@@ -133,8 +129,16 @@ impl World{
             parents,
             saver,
             seed,
-            start_step
+            start_step,
+            start_agents: num_agents,
+            start_food: num_food,
+            round_steps: ROUND_STEPS
         }
+    }
+
+    // 0 oznacza ciagly swiat bez rund
+    pub fn set_round_steps(&mut self, round_steps: u64){
+        self.round_steps = round_steps;
     }
 
     pub fn handle_input(&mut self){
@@ -202,9 +206,49 @@ impl World{
         self.spawn_food();
         self.record_stats();
 
+        // Demo tylko pokazuje model, wiec nie wymienia plemion
+        if self.mode != Mode::Demo && self.round_steps > 0 && self.total_steps() % self.round_steps == 0{
+            self.end_round();
+        }
+
         if self.stats.step() % MODEL_SAVE_INTERVAL == 0{
             self.save_latest();
         }
+    }
+
+    fn total_steps(&self) -> u64{
+        self.start_step + self.stats.step()
+    }
+
+    // Plemiona dostaja wagi wedlug rankingu i zaczynaja od nowa na nowej mapie
+    fn end_round(&mut self){
+        let finished_round = self.total_steps() / self.round_steps.max(1);
+        let ranking = self.ranking();
+        println!("Runda {}: wygralo plemie {}, pola {}", finished_round, ranking[0] + 1, self.terrain.owned_tiles(ranking[0]));
+
+        let sources = next_round_sources(&ranking);
+        let pools: Vec<Vec<Brain>> = sources.iter().map(|&source| self.gene_pool(source)).collect();
+        self.parents = sources.iter().map(|&source| self.parents[source].clone()).collect();
+
+        self.terrain = Terrain::new(MAP_ROWS, MAP_COLS, TILE_SIZE, BASE_SIZE, self.seed.wrapping_add(finished_round as u32));
+        self.food = starting_food(&self.terrain, self.start_food);
+        self.agents.clear();
+
+        let agents_per_tribe = self.start_agents / self.tribes.len();
+        for (tribe, pool) in pools.iter().enumerate(){
+            for _ in 0..agents_per_tribe{
+                let parent = if pool.is_empty() { None } else { Some(&pool[rand::gen_range(0, pool.len())]) };
+                let brain = self.mode.respawn_brain(parent);
+                self.agents.push(Agent::spawn_at_tile(self.tribes[tribe].random_base_tile(), tribe, TILE_SIZE, brain));
+            }
+        }
+    }
+
+    fn gene_pool(&self, tribe: usize) -> Vec<Brain>{
+        let living = self.agents.iter()
+            .filter(|a| a.is_alive() && a.tribe() == tribe)
+            .map(|a| a.brain().clone());
+        self.parents[tribe].iter().cloned().chain(living).collect()
     }
 
     fn resolve_attacks(&mut self, attacks: &[(usize, usize)]){
@@ -304,9 +348,9 @@ impl World{
         let steps = if self.mode == Mode::Demo {
             format!("Model: {} krokow", format_steps(self.start_step))
         } else {
-            format!("Kroki: {}", format_steps(self.start_step + self.stats.step()))
+            format!("Runda {}, kroki: {}", self.total_steps() / self.round_steps.max(1) + 1, format_steps(self.total_steps()))
         };
-        draw_rectangle(STATS_BUTTON_WIDTH + 150.0, 0.0, 230.0, STATS_BUTTON_HEIGHT, panel_color);
+        draw_rectangle(STATS_BUTTON_WIDTH + 150.0, 0.0, 300.0, STATS_BUTTON_HEIGHT, panel_color);
         draw_text(&steps, STATS_BUTTON_WIDTH + 160.0, 18.0, 20.0, WHITE);
 
         if !self.stats_open{
@@ -437,6 +481,26 @@ impl World{
 
         self.draw_stats();
     }
+}
+
+fn starting_food(terrain: &Terrain, count: usize) -> Vec<Food>{
+    let mut food = Vec::new();
+    for _ in 0..count * 10{
+        if food.len() >= count{
+            break;
+        }
+        if let Some((x, y)) = Food::random_free_spot(terrain, &food){
+            food.push(Food::new(x, y));
+        }
+    }
+    food
+}
+
+// Z ktorego plemienia kazde plemie bierze wagi: ostatnie zastepuje kopia zwyciezcy
+fn next_round_sources(ranking: &[usize]) -> Vec<usize>{
+    let mut sources: Vec<usize> = (0..ranking.len()).collect();
+    sources[ranking[ranking.len() - 1]] = ranking[0];
+    sources
 }
 
 fn remember_parent(pool: &mut Vec<Brain>, brain: &Brain){
@@ -626,6 +690,31 @@ mod tests{
     fn tribe_without_enemies_sees_nobody(){
         let agents = [LivingAgent{ index: 1, tribe: 0, x: 1.0, y: 0.0, energy: 1.0 }];
         assert!(nearest_enemy(0, 0.0, 0.0, &agents).is_none());
+    }
+
+    #[test]
+    fn last_tribe_takes_weights_from_the_winner(){
+        assert_eq!(next_round_sources(&[1, 2, 0, 3]), vec![0, 1, 2, 1]);
+    }
+
+    #[test]
+    fn new_round_restarts_tribes_and_passes_the_parents_of_the_winner(){
+        let mut world = World::new(40, 100, 1, Mode::Demo, None, None, true);
+        let winner_brain = Brain::new();
+        let ranking = world.ranking();
+        world.parents[ranking[0]] = vec![winner_brain.clone()];
+        world.parents[ranking[3]] = vec![Brain::new()];
+        world.agents.clear();
+
+        world.end_round();
+
+        assert_eq!(world.agents.len(), 40);
+        assert_eq!(world.food.len(), 100);
+        assert_eq!(world.parents[ranking[3]][0].weights(), winner_brain.weights());
+        assert!(world.agents.iter()
+            .filter(|a| a.tribe() == ranking[3])
+            .all(|a| a.brain().weights() == winner_brain.weights()));
+        assert!((0..4).all(|tribe| world.terrain.owned_tiles(tribe) == BASE_SIZE * BASE_SIZE));
     }
 
     #[test]

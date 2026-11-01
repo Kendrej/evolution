@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::brain::WEIGHT_COUNT;
 use crate::tribe::TRIBE_COLORS;
+use macroquad::rand::gen_range;
 
 const MODELS_DIR: &str = "models";
 const COMPARISONS_DIR: &str = "comparisons";
@@ -12,6 +13,7 @@ const MAIN_FILE: &str = "main.json";
 const LATEST_FILE: &str = "latest.json";
 const FINAL_FILE: &str = "final.json";
 const NAME_FILE: &str = "name.txt";
+const MATCH_TRIBE_SIZE: usize = 10;
 
 // Zapisana populacja: wagi wszystkich zywych agentow, osobno dla kazdego plemienia.
 // Nazwe i zrodlo ma tylko glowny model, bo tylko on trafia do gita bez swojego folderu.
@@ -38,6 +40,27 @@ impl Model{
         let temporary = path.with_extension("tmp");
         fs::write(&temporary, serde_json::to_string(self)?)?;
         fs::rename(&temporary, path)
+    }
+
+    // Najliczniejsze plemie, czyli to, ktore prowadzilo, gdy zapisano model
+    fn champions(&self) -> &Vec<Vec<f32>>{
+        self.tribes.iter().max_by_key(|tribe| tribe.len()).expect("model ma plemiona")
+    }
+
+    // Model do meczu: dwa plemiona z mistrzow pierwszego modelu i dwa z mistrzow drugiego
+    pub fn for_match(first: &Model, second: &Model) -> Model{
+        let pick = |champions: &Vec<Vec<f32>>| -> Vec<Vec<f32>> {
+            (0..MATCH_TRIBE_SIZE).map(|_| champions[gen_range(0, champions.len())].clone()).collect()
+        };
+        Model{
+            seed: 0,
+            step: 0,
+            weight_count: WEIGHT_COUNT,
+            tribes: vec![pick(first.champions()), pick(first.champions()), pick(second.champions()), pick(second.champions())],
+            parents: Vec::new(),
+            name: String::new(),
+            source: String::new()
+        }
     }
 
     pub fn load(path: &Path) -> Result<Model, String>{
@@ -184,7 +207,8 @@ impl ModelStore{
 
     // Przebiegi porownawcze nie pojawiaja sie w menu i nigdy nie zmieniaja glownego modelu
     pub fn comparison(&self, seed: u32, mode: &str) -> ModelSaver{
-        let id = ModelStore::run_id(seed, mode);
+        // Numer procesu rozdziela przebiegi z tym samym ziarnem uruchomione w tej samej sekundzie
+        let id = format!("{}_{}", ModelStore::run_id(seed, mode), std::process::id());
         ModelSaver{
             dir: self.root.join(COMPARISONS_DIR).join(&id),
             id,
@@ -239,6 +263,10 @@ impl ModelSaver{
 
     pub fn save_final(&self, model: &Model){
         self.save(model, FINAL_FILE);
+    }
+
+    pub fn final_path(&self) -> PathBuf{
+        self.dir.join(FINAL_FILE)
     }
 
     fn save(&self, model: &Model, file_name: &str){
@@ -321,6 +349,21 @@ mod tests{
 
         assert!(Model::load(&path).is_err());
         fs::remove_dir_all(&store.root).unwrap();
+    }
+
+    #[test]
+    fn match_takes_tribes_from_the_largest_tribe_of_each_model(){
+        let mut first = sample_model(1);
+        first.tribes[2] = vec![vec![0.1; WEIGHT_COUNT]; 3];
+        let mut second = sample_model(1);
+        second.tribes[3] = vec![vec![0.9; WEIGHT_COUNT]; 3];
+
+        let duel = Model::for_match(&first, &second);
+
+        assert_eq!(duel.step, 0);
+        assert!(duel.tribes[0].iter().chain(&duel.tribes[1]).all(|weights| weights[0] == 0.1));
+        assert!(duel.tribes[2].iter().chain(&duel.tribes[3]).all(|weights| weights[0] == 0.9));
+        assert_eq!(duel.tribes[0].len(), MATCH_TRIBE_SIZE);
     }
 
     #[test]
