@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 use std::f32::consts::{FRAC_PI_2, TAU};
-use crate::model::{Model, ModelEntry, ModelStore, format_steps};
+use crate::model::{Model, ModelEntry, ModelStore, format_steps, is_name_taken};
 
 const BUTTON_WIDTH: f32 = 660.0;
 const BUTTON_HEIGHT: f32 = 32.0;
@@ -86,11 +86,14 @@ fn read_name(name: &mut String){
     }
 }
 
-fn draw_name_input(title: &str, name: &str){
+fn draw_name_input(title: &str, name: &str, taken: bool){
     draw_text(title, LEFT, 45.0, 28.0, WHITE);
     draw_rectangle(LEFT, 70.0, BUTTON_WIDTH, BUTTON_HEIGHT, Color::from_rgba(45, 50, 62, 255));
     draw_text(&format!("{}_", name), LEFT + 10.0, 92.0, 22.0, WHITE);
     draw_text("Enter: zatwierdz, Esc: anuluj", LEFT, 130.0, 20.0, GRAY);
+    if taken{
+        draw_text("Ta nazwa jest juz zajeta", LEFT, 155.0, 20.0, RED);
+    }
 }
 
 // Zwraca Some(true) po potwierdzeniu, Some(false) po rezygnacji i None, gdy nie ma jeszcze decyzji
@@ -213,9 +216,10 @@ pub async fn choose(store: &ModelStore) -> Option<Choice>{
                 }
             }
             Screen::NewName => {
-                draw_name_input("Nazwa nowej populacji", &name);
                 read_name(&mut name);
-                if is_key_pressed(KeyCode::Enter) && !name.trim().is_empty(){
+                let taken = is_name_taken(&entries, &name, None);
+                draw_name_input("Nazwa nowej populacji", &name, taken);
+                if is_key_pressed(KeyCode::Enter) && !name.trim().is_empty() && !taken{
                     return Some(Choice::New{ name: name.trim().to_string() });
                 }
                 if is_key_pressed(KeyCode::Escape){
@@ -223,9 +227,10 @@ pub async fn choose(store: &ModelStore) -> Option<Choice>{
                 }
             }
             Screen::Rename{ index, demo } => {
-                draw_name_input("Nowa nazwa", &name);
                 read_name(&mut name);
-                if is_key_pressed(KeyCode::Enter) && !name.trim().is_empty(){
+                let taken = is_name_taken(&entries, &name, Some(&entries[*index].id));
+                draw_name_input("Nowa nazwa", &name, taken);
+                if is_key_pressed(KeyCode::Enter) && !name.trim().is_empty() && !taken{
                     error = store.rename(&entries[*index], name.trim()).err();
                     entries = store.list();
                     next_screen = Some(Screen::List{ demo: *demo });

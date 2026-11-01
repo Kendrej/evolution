@@ -194,6 +194,12 @@ impl ModelStore{
     }
 }
 
+// Wielkosc liter sie nie liczy, zeby na liscie nie bylo prawie takich samych nazw.
+// Populacja zmieniajaca nazwe podaje swoje id, bo nie koliduje sama ze soba.
+pub fn is_name_taken(entries: &[ModelEntry], name: &str, own_id: Option<&str>) -> bool{
+    entries.iter().any(|entry| Some(entry.id.as_str()) != own_id && entry.name.trim().eq_ignore_ascii_case(name.trim()))
+}
+
 // Liczba kroków w czytelnej postaci, np. 1 234 567
 pub fn format_steps(steps: u64) -> String{
     let digits = steps.to_string();
@@ -343,6 +349,31 @@ mod tests{
         store.rename(entry_named(&entries, "Pierwsza"), "Druga").unwrap();
 
         assert_eq!(store.list()[0].name, "Druga");
+        fs::remove_dir_all(&store.root).unwrap();
+    }
+
+    #[test]
+    fn name_of_another_population_is_taken(){
+        let store = test_store("taken");
+        store.new_population(1, "inherit", "Pierwsza").save_latest(&sample_model(1));
+        let entries = store.list();
+
+        assert!(is_name_taken(&entries, "Pierwsza", None));
+        assert!(is_name_taken(&entries, " pierwsza ", None));
+        assert!(!is_name_taken(&entries, "Druga", None));
+        fs::remove_dir_all(&store.root).unwrap();
+    }
+
+    #[test]
+    fn population_can_keep_its_own_name_when_renaming(){
+        let store = test_store("own_name");
+        store.new_population(1, "inherit", "Pierwsza").save_latest(&sample_model(1));
+        store.new_population(2, "inherit", "Druga").save_latest(&sample_model(1));
+        let entries = store.list();
+        let first = entry_named(&entries, "Pierwsza");
+
+        assert!(!is_name_taken(&entries, "PIERWSZA", Some(&first.id)));
+        assert!(is_name_taken(&entries, "Druga", Some(&first.id)));
         fs::remove_dir_all(&store.root).unwrap();
     }
 
