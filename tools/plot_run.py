@@ -1,7 +1,7 @@
 """Rysuje wykresy z pliku CSV przebiegu i zapisuje je jako PNG obok niego.
 
 Uzycie:
-    python tools/plot_run.py                  najnowszy przebieg z runs/
+    python tools/plot_run.py                  najnowszy przebieg z runs/latest/
     python tools/plot_run.py runs/plik.csv    wskazany przebieg
 """
 import csv
@@ -13,7 +13,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-RUNS_DIR = Path(__file__).resolve().parent.parent / "runs"
+RUNS_DIR = Path(__file__).resolve().parent.parent / "runs" / "latest"
 REQUIRED_COLUMN = "respawns"
 SMOOTHING_WINDOW = 10
 TRIBE_COLORS = ["#eb4b46", "#46c8e1", "#f0c841", "#cd5fc8"]

@@ -1,15 +1,18 @@
 """Porownuje przebiegi z dziedziczeniem wag i bez niego na tych samych ziarnach.
 
 Uzycie:
-    python tools/compare_inheritance.py [kroki] [liczba_ziaren]
+    python tools/compare_inheritance.py [kroki] [liczba_ziaren] [opis]
 
-Wykres trafia do runs/, a w konsoli pojawia sie tabela z ostatniej czesci przebiegow.
+Kazde porownanie ma folder runs/comparisons/<data>_<opis>/ z plikami CSV, wykresem
+i tabela z ostatniej czesci przebiegow, ktora pojawia sie tez w konsoli.
 """
 import csv
+import shutil
 import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from pathlib import Path
 
 import matplotlib
@@ -79,6 +82,10 @@ def main():
     steps_count = int(sys.argv[1]) if len(sys.argv) > 1 else 200000
     seed_count = int(sys.argv[2]) if len(sys.argv) > 2 else 5
     seeds = [FIRST_SEED + i for i in range(seed_count)]
+    folder_name = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    if len(sys.argv) > 3:
+        folder_name += f"_{sys.argv[3]}"
+    output_dir = ROOT / "runs" / "comparisons" / folder_name
 
     subprocess.run(["cargo", "build", "--release"], cwd=ROOT, check=True)
 
@@ -87,6 +94,9 @@ def main():
     with ThreadPoolExecutor() as pool:
         paths = list(pool.map(lambda job: run_simulation(*job), jobs))
     print(f"{len(jobs)} przebiegow w {time.time() - started:.0f} s")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    paths = [Path(shutil.move(path, output_dir / path.name)) for path in paths]
 
     results = {}
     for mode in MODES:
@@ -105,18 +115,20 @@ def main():
         axis.set_xlabel("Krok symulacji")
     figure.suptitle(f"Średnia z {seed_count} ziaren, suma plemion na 1000 kroków, wygładzone po {SMOOTHING_WINDOW} pomiarach", fontsize=11)
     figure.tight_layout()
-    output = ROOT / "runs" / f"compare_{int(started)}.png"
-    figure.savefig(output, dpi=110)
-    print(f"Zapisano: {output}")
+    figure.savefig(output_dir / "wykres.png", dpi=110)
+    print(f"Zapisano: {output_dir}")
 
-    print(f"Srednia z ostatnich {FINAL_PART:.0%} krokow:")
+    lines = [f"Srednia z ostatnich {FINAL_PART:.0%} krokow:"]
     for name, _ in METRICS:
         cells = []
         for mode in MODES:
             values = results[mode][1][name]
             final = values[int(len(values) * (1 - FINAL_PART)):]
             cells.append(f"{mode} {sum(final) / len(final):8.2f}")
-        print(f"  {name:12} {'  '.join(cells)}")
+        lines.append(f"  {name:12} {'  '.join(cells)}")
+    summary = "\n".join(lines)
+    print(summary)
+    (output_dir / "wyniki.txt").write_text(summary + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

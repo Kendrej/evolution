@@ -22,6 +22,8 @@ pub struct Model{
     pub weight_count: usize,
     pub tribes: Vec<Vec<Vec<f32>>>,
     #[serde(default)]
+    pub parents: Vec<Vec<Vec<f32>>>,
+    #[serde(default)]
     pub name: String,
     #[serde(default)]
     pub source: String
@@ -46,7 +48,7 @@ impl Model{
             return Err(format!("Zla liczba plemion: {}", model.tribes.len()));
         }
         if model.weight_count != WEIGHT_COUNT
-            || model.tribes.iter().flatten().any(|weights| weights.len() != WEIGHT_COUNT){
+            || model.tribes.iter().chain(&model.parents).flatten().any(|weights| weights.len() != WEIGHT_COUNT){
             return Err(format!("Model pasuje do innej sieci, oczekiwano {} wag", WEIGHT_COUNT));
         }
         Ok(model)
@@ -268,6 +270,7 @@ mod tests{
             step,
             weight_count: WEIGHT_COUNT,
             tribes: vec![vec![vec![0.5; WEIGHT_COUNT]], Vec::new(), Vec::new(), Vec::new()],
+            parents: vec![vec![vec![0.25; WEIGHT_COUNT]], Vec::new(), Vec::new(), Vec::new()],
             name: String::new(),
             source: String::new()
         }
@@ -286,6 +289,7 @@ mod tests{
 
         assert_eq!(loaded.step, 1000);
         assert_eq!(loaded.tribes[0][0], vec![0.5; WEIGHT_COUNT]);
+        assert_eq!(loaded.parents[0][0], vec![0.25; WEIGHT_COUNT]);
         fs::remove_dir_all(&store.root).unwrap();
     }
 
@@ -295,6 +299,18 @@ mod tests{
         let path = store.root.join("model.json");
         let mut model = sample_model(1);
         model.tribes[0][0].pop();
+        model.save(&path).unwrap();
+
+        assert!(Model::load(&path).is_err());
+        fs::remove_dir_all(&store.root).unwrap();
+    }
+
+    #[test]
+    fn parents_for_a_different_network_are_rejected(){
+        let store = test_store("wrong_parent_size");
+        let path = store.root.join("model.json");
+        let mut model = sample_model(1);
+        model.parents[0][0].pop();
         model.save(&path).unwrap();
 
         assert!(Model::load(&path).is_err());

@@ -16,6 +16,7 @@ const SIMULATION_SPEEDS: [usize; 3] = [1, 10, 50];
 const STATS_BUTTON_WIDTH: f32 = 130.0;
 const STATS_BUTTON_HEIGHT: f32 = 25.0;
 const MODEL_SAVE_INTERVAL: u64 = 50_000;
+const PARENT_POOL_SIZE: usize = 20;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Mode{
@@ -62,13 +63,14 @@ pub struct World{
     speed_index: usize,
     mode: Mode,
     saved_brains: Vec<Vec<Brain>>,
+    parents: Vec<Vec<Brain>>,
     saver: Option<ModelSaver>,
     seed: u32,
     start_step: u64
 }
 
 impl World{
-    pub fn new(num_agents: usize, num_food: usize, seed: u32, mode: Mode, model: Option<Model>, saver: Option<ModelSaver>) -> World{
+    pub fn new(num_agents: usize, num_food: usize, seed: u32, mode: Mode, model: Option<Model>, saver: Option<ModelSaver>, is_comparison: bool) -> World{
         let mut agents = Vec::new();
         let mut food = Vec::new();
         let rows = 60;
@@ -77,7 +79,7 @@ impl World{
         let base_size = 5;
         let terrain = Terrain::new(rows, cols, tile_size, base_size, seed);
         let tribes = Tribe::create_tribes(terrain.config());
-        let stats = Stats::new(seed, tribes.len(), mode.name());
+        let stats = Stats::new(seed, tribes.len(), mode.name(), is_comparison);
         let height = terrain.height();
         let width = terrain.width();
         let cam: Camera2D = Camera2D::from_display_rect(Rect::new(0.0, 0.0, width, height));
@@ -87,6 +89,10 @@ impl World{
             .flat_map(|m| &m.tribes)
             .map(|tribe| tribe.iter().map(|weights| Brain::from_weights(weights)).collect())
             .collect();
+        let mut parents: Vec<Vec<Brain>> = vec![Vec::new(); tribes.len()];
+        for (pool, saved) in parents.iter_mut().zip(model.iter().flat_map(|m| &m.parents)){
+            *pool = saved.iter().map(|weights| Brain::from_weights(weights)).collect();
+        }
 
         if model.is_some(){
             for (tribe, brains) in saved_brains.iter().enumerate(){
@@ -122,6 +128,7 @@ impl World{
             speed_index: 0,
             mode,
             saved_brains,
+            parents,
             saver,
             seed,
             start_step
@@ -154,9 +161,15 @@ impl World{
             }
         }
 
-        for a in &mut self.agents{
+        let ready_agents: Vec<ReadyAgent> = self.agents.iter().enumerate()
+            .filter(|(_, a)| a.is_ready_to_reproduce())
+            .map(|(index, a)| ReadyAgent{ index, tribe: a.tribe(), x: a.get_x(), y: a.get_y() })
+            .collect();
+
+        for (index, a) in self.agents.iter_mut().enumerate(){
             let was_alive = a.is_alive();
-            let senses = sense(a, &self.terrain, &self.tribes[a.tribe()], &self.food);
+            let partner = nearest_partner(index, a.tribe(), a.get_x(), a.get_y(), &ready_agents);
+            let senses = sense(a, &self.terrain, &self.tribes[a.tribe()], &self.food, partner);
             a.update(&self.terrain, &senses);
             if a.is_alive(){
                 self.terrain.capture(a.get_x(), a.get_y(), a.tribe());
@@ -187,12 +200,16 @@ impl World{
                 .map(|a| a.brain().weights().to_vec())
                 .collect())
             .collect();
+        let parents = self.parents.iter()
+            .map(|pool| pool.iter().map(|brain| brain.weights().to_vec()).collect())
+            .collect();
 
         Model{
             seed: self.seed,
             step: self.start_step + self.stats.step(),
             weight_count: crate::brain::WEIGHT_COUNT,
             tribes,
+            parents,
             name: String::new(),
             source: String::new()
         }
@@ -276,7 +293,11 @@ impl World{
             for _ in alive.len()..MIN_TRIBE_POPULATION{
                 // Gdy plemie wymarlo, rodzicem moze byc jeszcze ktos z wczytanego modelu
                 let saved = self.saved_brains.get(i).map_or(&[][..], |brains| &brains[..]);
-                let parent = if !alive.is_empty(){
+                let parent = if self.mode == Mode::Inherit{
+                    let pool = &self.parents[i];
+                    if pool.is_empty() { None } else { Some(&pool[rand::gen_range(0, pool.len())]) }
+                }
+                else if !alive.is_empty(){
                     Some(self.agents[alive[rand::gen_range(0, alive.len())]].brain())
                 }
                 else if !saved.is_empty(){
@@ -306,6 +327,9 @@ impl World{
                 }
                 if a.can_reproduce_with(b, &self.terrain){
                     let brain = self.mode.child_brain(a.brain(), b.brain());
+                    let pool = &mut self.parents[a.tribe()];
+                    remember_parent(pool, a.brain());
+                    remember_parent(pool, b.brain());
                     children.push(a.reproduce_with(b, tile_size, brain));
                 }
             }
@@ -353,7 +377,28 @@ impl World{
     }
 }
 
-fn sense(agent: &Agent, terrain: &Terrain, tribe: &Tribe, food: &[Food]) -> Senses{
+fn remember_parent(pool: &mut Vec<Brain>, brain: &Brain){
+    if pool.len() >= PARENT_POOL_SIZE{
+        pool.remove(0);
+    }
+    pool.push(brain.clone());
+}
+
+struct ReadyAgent{
+    index: usize,
+    tribe: usize,
+    x: f32,
+    y: f32
+}
+
+fn nearest_partner(index: usize, tribe: usize, x: f32, y: f32, ready_agents: &[ReadyAgent]) -> Option<&ReadyAgent>{
+    let distance_sq = |other: &ReadyAgent| (other.x - x).powi(2) + (other.y - y).powi(2);
+    ready_agents.iter()
+        .filter(|other| other.index != index && other.tribe == tribe)
+        .min_by(|a, b| distance_sq(a).total_cmp(&distance_sq(b)))
+}
+
+fn sense(agent: &Agent, terrain: &Terrain, tribe: &Tribe, food: &[Food], partner: Option<&ReadyAgent>) -> Senses{
     let (x, y) = (agent.get_x(), agent.get_y());
     let angle = agent.angle();
     let tribe_id = agent.tribe();
@@ -379,6 +424,11 @@ fn sense(agent: &Agent, terrain: &Terrain, tribe: &Tribe, food: &[Food]) -> Sens
         None => (0.0, 1.0)
     };
 
+    let (partner_direction, partner_distance) = match partner{
+        Some(p) => (relative_direction(x, y, angle, p.x, p.y), ((p.x - x).powi(2) + (p.y - y).powi(2)).sqrt() / max_distance),
+        None => (0.0, 1.0)
+    };
+
     let tile_at_angle = |a: f32| terrain.tile_sense(x + tile_size * a.cos(), y + tile_size * a.sin(), tribe_id);
 
     Senses{
@@ -388,6 +438,8 @@ fn sense(agent: &Agent, terrain: &Terrain, tribe: &Tribe, food: &[Food]) -> Sens
         base_distance: base_distance / max_distance,
         food_direction,
         food_distance,
+        partner_direction,
+        partner_distance,
         tile_here: terrain.tile_sense(x, y, tribe_id),
         capture_progress: terrain.capture_progress_at(x, y, tribe_id),
         tile_ahead: tile_at_angle(angle),
@@ -430,5 +482,45 @@ impl Food{
 
     fn draw(&self){
         draw_circle(self.x, self.y, self.size, ORANGE);
+    }
+}
+
+#[cfg(test)]
+mod tests{
+    use super::*;
+
+    fn ready(index: usize, tribe: usize, x: f32) -> ReadyAgent{
+        ReadyAgent{ index, tribe, x, y: 0.0 }
+    }
+
+    #[test]
+    fn parent_pool_drops_the_oldest_parent_when_full(){
+        let mut pool = Vec::new();
+        let oldest = Brain::new();
+        remember_parent(&mut pool, &oldest);
+        for _ in 0..PARENT_POOL_SIZE{
+            remember_parent(&mut pool, &Brain::new());
+        }
+
+        assert_eq!(pool.len(), PARENT_POOL_SIZE);
+        assert!(pool.iter().all(|brain| brain.weights() != oldest.weights()));
+    }
+
+    #[test]
+    fn nearest_partner_is_the_closest_one_from_the_tribe(){
+        let agents = [ready(1, 0, 50.0), ready(2, 0, 20.0), ready(3, 1, 5.0)];
+        assert_eq!(nearest_partner(0, 0, 0.0, 0.0, &agents).unwrap().index, 2);
+    }
+
+    #[test]
+    fn agent_is_not_its_own_partner(){
+        let agents = [ready(0, 0, 0.0)];
+        assert!(nearest_partner(0, 0, 0.0, 0.0, &agents).is_none());
+    }
+
+    #[test]
+    fn other_tribes_are_not_partners(){
+        let agents = [ready(1, 1, 10.0)];
+        assert!(nearest_partner(0, 0, 0.0, 0.0, &agents).is_none());
     }
 }

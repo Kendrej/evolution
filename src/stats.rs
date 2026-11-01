@@ -1,8 +1,12 @@
 use std::fs::{self, File};
-use std::io::{BufWriter, Write};
+use std::io::{self, BufWriter, Write};
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const STATS_INTERVAL: u64 = 1000;
+const LATEST_DIR: &str = "runs/latest";
+const TRAINING_DIR: &str = "runs/training";
+const COMPARISONS_DIR: &str = "runs/comparisons";
 
 #[derive(Clone, Default)]
 struct TribeStats{
@@ -24,20 +28,27 @@ pub struct Stats{
 }
 
 impl Stats{
-    pub fn new(seed: u32, num_tribes: usize, mode: Option<&str>) -> Stats{
+    pub fn new(seed: u32, num_tribes: usize, mode: Option<&str>, is_comparison: bool) -> Stats{
         Stats{
             seed,
             step: 0,
             tribes: vec![TribeStats::default(); num_tribes],
-            file: mode.and_then(|mode| Stats::create_file(seed, mode))
+            file: mode.and_then(|mode| Stats::create_file(seed, mode, is_comparison))
         }
     }
 
-    fn create_file(seed: u32, mode: &str) -> Option<BufWriter<File>>{
-        let time = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |t| t.as_secs());
-        let path = format!("runs/run_{}_{}_seed_{}_{}.csv", time, std::process::id(), seed, mode);
+    fn create_file(seed: u32, mode: &str, is_comparison: bool) -> Option<BufWriter<File>>{
+        if !is_comparison{
+            if let Err(e) = archive_runs(Path::new(LATEST_DIR), Path::new(TRAINING_DIR)){
+                eprintln!("Nie udalo sie przeniesc poprzedniego przebiegu: {}", e);
+            }
+        }
 
-        let result = fs::create_dir_all("runs")
+        let dir = if is_comparison { COMPARISONS_DIR } else { LATEST_DIR };
+        let time = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |t| t.as_secs());
+        let path = format!("{}/run_{}_{}_seed_{}_{}.csv", dir, time, std::process::id(), seed, mode);
+
+        let result = fs::create_dir_all(dir)
             .and_then(|_| File::create(&path))
             .and_then(|file| {
                 let mut writer = BufWriter::new(file);
@@ -124,5 +135,60 @@ impl Stats{
 
     pub fn total_respawns(&self, tribe: usize) -> u32{
         self.tribes[tribe].total_respawns
+    }
+}
+
+fn has_no_measurements(path: &Path) -> bool{
+    path.extension().is_some_and(|extension| extension == "csv")
+        && fs::read_to_string(path).is_ok_and(|text| text.lines().count() <= 1)
+}
+
+fn archive_runs(from: &Path, to: &Path) -> io::Result<()>{
+    if !from.exists(){
+        return Ok(());
+    }
+
+    fs::create_dir_all(to)?;
+    for entry in fs::read_dir(from)?{
+        let entry = entry?;
+        let path = entry.path();
+        if has_no_measurements(&path){
+            fs::remove_file(&path)?;
+        }
+        else{
+            fs::rename(&path, to.join(entry.file_name()))?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests{
+    use super::*;
+
+    #[test]
+    fn archive_moves_runs_and_drops_files_without_measurements(){
+        let root = std::env::temp_dir().join(format!("ewolucja_test_{}_archive", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let (from, to) = (root.join("latest"), root.join("training"));
+        fs::create_dir_all(&from).unwrap();
+        fs::write(from.join("run.csv"), "step\n1000\n").unwrap();
+        fs::write(from.join("run.png"), "wykres").unwrap();
+        fs::write(from.join("empty.csv"), "step\n").unwrap();
+
+        archive_runs(&from, &to).unwrap();
+
+        assert!(to.join("run.csv").exists());
+        assert!(to.join("run.png").exists());
+        assert!(!to.join("empty.csv").exists());
+        assert_eq!(fs::read_dir(&from).unwrap().count(), 0);
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn archive_without_a_previous_run_does_nothing(){
+        let root = std::env::temp_dir().join(format!("ewolucja_test_{}_no_archive", std::process::id()));
+        assert!(archive_runs(&root.join("latest"), &root.join("training")).is_ok());
+        assert!(!root.exists());
     }
 }

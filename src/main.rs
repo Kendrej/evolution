@@ -10,11 +10,13 @@ mod menu;
 use world::{Mode, World};
 use model::ModelStore;
 use menu::Choice;
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // Wpisz Some(ziarno), zeby powtorzyc konkretny przebieg
 const FIXED_SEED: Option<u32> = None;
 const INHERITANCE: bool = true;
+const PLOT_SCRIPT: &str = "tools/plot_run.py";
 
 fn random_seed() -> u32{
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |t| t.as_nanos() as u32)
@@ -28,6 +30,15 @@ async fn run_window() {
         if !run_simulation(choice, &store).await {
             return;
         }
+    }
+}
+
+fn plot_latest_run(mode: Mode){
+    if mode == Mode::Demo{
+        return;
+    }
+    if let Err(e) = Command::new("python").arg(PLOT_SCRIPT).spawn(){
+        eprintln!("Nie udalo sie narysowac wykresow: {}", e);
     }
 }
 
@@ -46,13 +57,14 @@ async fn run_simulation(choice: Choice, store: &ModelStore) -> bool {
         Choice::Saved{ model, id, name, demo: false } => (training, Some(model), Some(store.resume_population(&id, &name))),
         Choice::Saved{ model, demo: true, .. } => (Mode::Demo, Some(model), None)
     };
-    let mut world = World::new(40, 100, seed, mode, model, saver);
+    let mut world = World::new(40, 100, seed, mode, model, saver, false);
     let mut confirming_exit = false;
 
 
     loop{
         if is_quit_requested(){
             world.save_latest();
+            plot_latest_run(mode);
             return false;
         }
 
@@ -70,6 +82,7 @@ async fn run_simulation(choice: Choice, store: &ModelStore) -> bool {
             match menu::confirm_exit(mode != Mode::Demo){
                 Some(true) => {
                     world.save_latest();
+                    plot_latest_run(mode);
                     return true;
                 }
                 Some(false) => confirming_exit = false,
@@ -99,7 +112,7 @@ fn run_headless(args: &[String]) -> Result<(), String>{
 
     rand::srand(seed as u64);
     let saver = mode.name().map(|name| ModelStore::new().comparison(seed, name));
-    let mut world = World::new(40, 100, seed, mode, None, saver);
+    let mut world = World::new(40, 100, seed, mode, None, saver, true);
     for _ in 0..steps{
         world.update();
     }
