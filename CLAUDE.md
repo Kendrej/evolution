@@ -33,13 +33,28 @@ Symulacja plemion w Ruście (macroquad). Celem jest neuroewolucja: każdy agent 
 ## Stan projektu
 Zrobione: statystyki i zapis do CSV, losowa mapa, minimalna populacja plemienia, przyspieszenie, struktura `Brain` i `Action`, zmysły agenta `Senses`, wykresy z plików CSV.
 
-`Brain` to sieć neuronowa z 16 wejściami, 8 neuronami ukrytymi i 3 wyjściami (163 wagi). `Senses` zawiera kierunek i odległość do najbliższego gotowego partnera z plemienia oraz kierunek, odległość i energię najbliższego wroga. Modele zapisane przed dodaniem walki się nie wczytają.
+`Brain` to sieć neuronowa z 18 wejściami, 8 neuronami ukrytymi i 3 wyjściami (179 wag). `Senses` zawiera kierunek i odległość do najbliższego gotowego partnera z plemienia, kierunek, odległość i energię najbliższego wroga oraz kierunek i odległość do najbliższej wrogiej bazy, która jeszcze nie upadła. Modele zapisane przed dodaniem zmysłu wrogiej bazy się nie wczytają, także obecny `models/main.json`.
 
-Walka: trzecie wyjście sieci to atak na najbliższego wroga w zasięgu, można go użyć co 30 kroków i kosztuje 0,25 energii także przy pudle. Trafienie zabiera 25 energii, a połowa trafia do atakującego. Zabójca trafia na listę rodziców z szansą 25%. Wolno atakować także w cudzej bazie. Ranking plemion liczy zajęte pola, a przy remisie żywych. Jest w panelu statystyk i na końcu przebiegu bez okna. `MIN_TRIBE_POPULATION` nadal nie pozwala plemieniu wymrzeć.
+Walka: trzecie wyjście sieci to atak na najbliższego wroga w zasięgu, można go użyć co 30 kroków i kosztuje 0,25 energii także przy pudle. Trafienie zabiera 25 energii, a połowa trafia do atakującego. Zabójca trafia na listę rodziców z szansą 25%. Wolno atakować także w cudzej bazie. Ranking plemion stawia najwyżej to, które najdłużej zostało na mapie. Między ocalałymi liczą się zajęte pola, a przy remisie żywi. Jest w panelu statystyk i na końcu przebiegu bez okna. `MIN_TRIBE_POPULATION` odradza agentów, dopóki plemię ma bazę.
 
 Rundy: co 50 000 kroków (poza demo) powstaje nowa mapa i nowe jedzenie, a każde plemię zaczyna od 10 agentów w bazie. Wagi bierze z listy rodziców i żywych swojego plemienia, z mutacją, ale ostatnie w rankingu dostaje wagi i listę rodziców zwycięzcy. W CSV `owned_tiles` i `alive` spadają więc na początku każdej rundy.
 
-Zdobywanie baz (tylko w treningu z rundami): gdy w bazie są wrogowie, a nie ma obrońców, oblężenie rośnie o 1 na krok, a w każdej innej sytuacji spada o 1. Po 600 krokach baza upada. Plemię ginie wtedy do końca rundy, jego pola stają się neutralne, a baza zostaje przyciemniona. Zdobywcą jest plemię z największą liczbą agentów w bazie, co trafia do kolumny `bases_taken` w CSV. Oblężona baza nie przyjmuje odrodzeń. Runda kończy się wcześniej, gdy zostanie jedno plemię. Pierwszy test (ziarno 1001, 300 000 kroków) dał 4 upadki baz w 6 rundach, choć agenci nie widzą wrogich baz.
+Bazy (tylko w treningu z rundami):
+- Wróg stoi w bazie, a obrońcy nie ma: oblężenie rośnie. Po 600 krokach baza upada.
+- Plemię bez bazy ginie do końca rundy, a jego pola stają się neutralne.
+- Zdobywcy stojący w bazie trafiają na listę rodziców.
+- Wygrywa plemię, które najdłużej zostało na mapie. Runda kończy się wcześniej, gdy zostanie jedno.
+
+Testy baz (`runs/comparisons/2026-11-02_*_bazy_*`, 5 ziaren po 2 mln kroków). Upadki baz w 4 ćwiartkach przebiegu:
+
+| wariant | upadki | razem |
+|---|---|---|
+| losowe sieci | 15, 27, 14, 10 | 66 |
+| bez nagrody | 41, 73, 45, 30 | 189 |
+| nagroda dla zdobywców | 37, 15, 24, 40 | 116 |
+| nagroda + ranking przetrwania | 56, 47, 33, 59 | 195 |
+
+Wniosek: bazy padają częściej niż przy losowych sieciach, ale nie coraz częściej, więc agenci nie uczą się ich zdobywać. Ostatni wariant ma najlepszą walkę (1% trafień, najwięcej zabójstw).
 
 Dzieci dziedziczą wagi po rodzicach z mutacją. W treningu odrodzeni agenci dostają wagi z listy 20 ostatnich rodziców swojego plemienia, z mutacją, a przy pustej liście nową, losową sieć. Lista jest zapisywana w modelu.
 
@@ -62,6 +77,6 @@ Rozmnażanie na własnych polach (`2026-11-01_20-52_dlugi_wlasne_pola`, ostatnie
 Rundy wobec ciągłego świata (`2026-11-01_22-23_rundy_dlugi`, 5 ziaren po 2 000 000 kroków, potem mecze po 100 000 kroków w obie strony na 3 nowych mapach): rundy 50 000 wygrały 15/15 (pola 69018 wobec 17450), 100 000 i 200 000 po 12/15, oba przegrywając na ziarnie 1001. Mecz przypomina start rundy, więc format sprzyja modelom z rund. Około 1% ataków nadal trafia.
 
 ## Następne kroki
-1. Zmysł kierunku do najbliższej wrogiej bazy (2 nowe wejścia, trening od nowa) i pomiar, czy agenci uczą się atakować bazy.
+1. Mocniejszy dobór plemion, np. wszystkie wymarłe plemiona dostają w następnej rundzie wagi zwycięzcy, a nie tylko ostatnie.
 2. Zachowywanie najlepszych modeli z rund.
 3. Cechy agentów dopiero po działających rundach.

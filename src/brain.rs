@@ -1,7 +1,7 @@
 use macroquad::rand::gen_range;
 use std::f32::consts::{PI, TAU};
 
-const INPUTS: usize = 16;
+const INPUTS: usize = 18;
 const HIDDEN: usize = 8;
 const OUTPUTS: usize = 3;
 // Kazdy neuron ma wage na kazde wejscie i jedna dodatkowa stala (bias)
@@ -30,6 +30,8 @@ pub struct Senses{
     pub enemy_direction: f32,
     pub enemy_distance: f32,
     pub enemy_energy: f32,
+    pub enemy_base_direction: f32,
+    pub enemy_base_distance: f32,
     pub tile_here: f32,
     pub capture_progress: f32,
     pub tile_ahead: f32,
@@ -51,6 +53,8 @@ impl Senses{
             self.enemy_direction,
             self.enemy_distance,
             self.enemy_energy,
+            self.enemy_base_direction,
+            self.enemy_base_distance,
             self.tile_here,
             self.capture_progress,
             self.tile_ahead,
@@ -175,6 +179,8 @@ mod tests{
             enemy_direction: value,
             enemy_distance: value,
             enemy_energy: value,
+            enemy_base_direction: value,
+            enemy_base_distance: value,
             tile_here: value,
             capture_progress: value,
             tile_ahead: value,
@@ -231,7 +237,7 @@ mod tests{
 
     #[test]
     fn network_has_expected_weight_count(){
-        assert_eq!(WEIGHT_COUNT, 163);
+        assert_eq!(WEIGHT_COUNT, 179);
     }
 
     #[test]

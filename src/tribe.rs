@@ -19,7 +19,8 @@ pub struct Tribe {
     base_max: (usize, usize),
     siege_progress: u32,
     besieged: bool,
-    extinct: bool
+    // Krok, w ktorym baza upadla. Brak oznacza, ze plemie nadal jest w grze.
+    fallen_at: Option<u64>
 }
 
 impl Tribe {
@@ -39,7 +40,7 @@ impl Tribe {
             base_max: (max_x, max_y),
             siege_progress: 0,
             besieged: false,
-            extinct: false
+            fallen_at: None
         }
     }
 
@@ -76,8 +77,8 @@ impl Tribe {
 
     // Wrogowie bez obroncow w bazie zblizaja ja do upadku, a w kazdej innej sytuacji
     // postep oblezenia spada. Zwraca true, gdy baza wlasnie upadla.
-    pub fn update_siege(&mut self, enemies_in_base: bool, defenders_in_base: bool) -> bool {
-        if self.extinct {
+    pub fn update_siege(&mut self, enemies_in_base: bool, defenders_in_base: bool, step: u64) -> bool {
+        if self.is_extinct() {
             return false
         }
 
@@ -89,27 +90,32 @@ impl Tribe {
         }
 
         if self.siege_progress >= BASE_FALL_STEPS {
-            self.fall();
+            self.fall(step);
             return true
         }
         false
     }
 
-    pub fn fall(&mut self) {
-        self.extinct = true;
+    pub fn fall(&mut self, step: u64) {
+        self.fallen_at = Some(step);
         self.besieged = false;
         self.siege_progress = 0;
     }
 
     // Nowa runda przywraca plemie do gry
     pub fn restore(&mut self) {
-        self.extinct = false;
+        self.fallen_at = None;
         self.besieged = false;
         self.siege_progress = 0;
     }
 
     pub fn is_extinct(&self) -> bool {
-        self.extinct
+        self.fallen_at.is_some()
+    }
+
+    // Im dluzej plemie przetrwalo, tym wyzszy wynik. Plemiona w grze maja najwyzszy.
+    pub fn survival(&self) -> u64 {
+        self.fallen_at.unwrap_or(u64::MAX)
     }
 
     pub fn is_besieged(&self) -> bool {
@@ -134,21 +140,22 @@ mod tests {
     fn base_falls_after_enough_steps_without_defenders() {
         let mut tribe = tribe();
         for _ in 0..BASE_FALL_STEPS - 1 {
-            assert!(!tribe.update_siege(true, false));
+            assert!(!tribe.update_siege(true, false, 0));
         }
 
-        assert!(tribe.update_siege(true, false));
+        assert!(tribe.update_siege(true, false, 700));
         assert!(tribe.is_extinct());
+        assert_eq!(tribe.survival(), 700);
     }
 
     #[test]
     fn defender_in_base_pushes_the_siege_back() {
         let mut tribe = tribe();
         for _ in 0..10 {
-            tribe.update_siege(true, false);
+            tribe.update_siege(true, false, 0);
         }
         for _ in 0..4 {
-            tribe.update_siege(true, true);
+            tribe.update_siege(true, true, 0);
         }
 
         assert!(!tribe.is_besieged());
@@ -158,10 +165,11 @@ mod tests {
     #[test]
     fn restored_tribe_is_back_in_the_game() {
         let mut tribe = tribe();
-        tribe.fall();
-        assert!(!tribe.update_siege(true, false));
+        tribe.fall(0);
+        assert!(!tribe.update_siege(true, false, 0));
 
         tribe.restore();
         assert!(!tribe.is_extinct());
+        assert_eq!(tribe.survival(), u64::MAX);
     }
 }

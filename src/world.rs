@@ -192,7 +192,7 @@ impl World{
             let was_alive = a.is_alive();
             let partner = nearest_partner(index, a.tribe(), a.get_x(), a.get_y(), &ready_agents);
             let enemy = nearest_enemy(a.tribe(), a.get_x(), a.get_y(), &living_agents);
-            let senses = sense(a, &self.terrain, &self.tribes[a.tribe()], &self.food, partner, enemy);
+            let senses = sense(a, &self.terrain, &self.tribes, &self.food, partner, enemy);
             if a.update(&self.terrain, &senses){
                 if let Some(enemy) = enemy{
                     attacks.push((index, enemy.index));
@@ -278,7 +278,8 @@ impl World{
             in_base[i] = 0;
             let enemies = in_base.iter().any(|&count| count > 0);
 
-            if self.tribes[i].update_siege(enemies, defenders){
+            let step = self.total_steps();
+            if self.tribes[i].update_siege(enemies, defenders, step){
                 // Baze zdobywa plemie, ktore ma w niej najwiecej agentow
                 let conqueror = (0..in_base.len()).max_by_key(|&tribe| in_base[tribe]).unwrap_or(i);
                 self.wipe_out(i, conqueror);
@@ -286,10 +287,16 @@ impl World{
         }
     }
 
-    // Plemie, ktore stracilo baze, wymiera do konca rundy, a jego ziemie staja sie neutralne
+    // Plemie, ktore stracilo baze, wymiera do konca rundy, a jego ziemie staja sie neutralne.
+    // Wrogowie stojacy w bazie trafiaja na liste rodzicow, zeby zdobywanie baz sie oplacalo.
     fn wipe_out(&mut self, tribe: usize, conqueror: usize){
         println!("Plemie {} stracilo baze na rzecz plemienia {} w kroku {}", tribe + 1, conqueror + 1, format_steps(self.total_steps()));
         self.stats.add_base_taken(conqueror);
+        for a in &self.agents{
+            if a.is_alive() && a.tribe() != tribe && self.terrain.is_base_of(a.get_x(), a.get_y(), tribe){
+                remember_parent(&mut self.parents[a.tribe()], a.brain());
+            }
+        }
         for a in &mut self.agents{
             if a.is_alive() && a.tribe() == tribe{
                 a.die();
@@ -321,10 +328,11 @@ impl World{
         }
     }
 
-    // Kolejnosc plemion od najlepszego. Rozstrzygaja zajete pola, a przy remisie liczba zywych.
+    // Kolejnosc plemion od najlepszego. Wygrywa plemie, ktore najdluzej zostalo na mapie,
+    // a miedzy ocalalymi rozstrzygaja zajete pola i potem liczba zywych.
     pub fn ranking(&self) -> Vec<usize>{
-        let scores: Vec<(usize, usize)> = (0..self.tribes.len())
-            .map(|tribe| (self.terrain.owned_tiles(tribe), self.alive_in_tribe(tribe)))
+        let scores: Vec<(u64, usize, usize)> = (0..self.tribes.len())
+            .map(|tribe| (self.tribes[tribe].survival(), self.terrain.owned_tiles(tribe), self.alive_in_tribe(tribe)))
             .collect();
         rank_tribes(&scores)
     }
@@ -610,20 +618,29 @@ fn nearest_enemy(tribe: usize, x: f32, y: f32, living_agents: &[LivingAgent]) ->
         .min_by(|a, b| distance_sq(a).total_cmp(&distance_sq(b)))
 }
 
-fn rank_tribes(scores: &[(usize, usize)]) -> Vec<usize>{
+fn rank_tribes(scores: &[(u64, usize, usize)]) -> Vec<usize>{
     let mut tribes: Vec<usize> = (0..scores.len()).collect();
     tribes.sort_by_key(|&tribe| std::cmp::Reverse(scores[tribe]));
     tribes
 }
 
-fn sense(agent: &Agent, terrain: &Terrain, tribe: &Tribe, food: &[Food], partner: Option<&ReadyAgent>, enemy: Option<&LivingAgent>) -> Senses{
+// Srodek najblizszej bazy plemienia, ktore jeszcze nie wymarlo
+fn nearest_enemy_base(tribe: usize, x: f32, y: f32, tribes: &[Tribe], tile_size: f32) -> Option<(f32, f32)>{
+    let distance_sq = |&(base_x, base_y): &(f32, f32)| (base_x - x).powi(2) + (base_y - y).powi(2);
+    tribes.iter().enumerate()
+        .filter(|(index, other)| *index != tribe && !other.is_extinct())
+        .map(|(_, other)| other.base_center(tile_size))
+        .min_by(|a, b| distance_sq(a).total_cmp(&distance_sq(b)))
+}
+
+fn sense(agent: &Agent, terrain: &Terrain, tribes: &[Tribe], food: &[Food], partner: Option<&ReadyAgent>, enemy: Option<&LivingAgent>) -> Senses{
     let (x, y) = (agent.get_x(), agent.get_y());
     let angle = agent.angle();
     let tribe_id = agent.tribe();
     let tile_size = terrain.config().tile_size;
     let max_distance = (terrain.width().powi(2) + terrain.height().powi(2)).sqrt();
 
-    let (base_x, base_y) = tribe.base_center(tile_size);
+    let (base_x, base_y) = tribes[tribe_id].base_center(tile_size);
     let base_distance = ((base_x - x).powi(2) + (base_y - y).powi(2)).sqrt();
 
     let mut nearest_food = None;
@@ -652,6 +669,11 @@ fn sense(agent: &Agent, terrain: &Terrain, tribe: &Tribe, food: &[Food], partner
         None => (0.0, 1.0, 0.0)
     };
 
+    let (enemy_base_direction, enemy_base_distance) = match nearest_enemy_base(tribe_id, x, y, tribes, tile_size){
+        Some((bx, by)) => (relative_direction(x, y, angle, bx, by), ((bx - x).powi(2) + (by - y).powi(2)).sqrt() / max_distance),
+        None => (0.0, 1.0)
+    };
+
     let tile_at_angle = |a: f32| terrain.tile_sense(x + tile_size * a.cos(), y + tile_size * a.sin(), tribe_id);
 
     Senses{
@@ -666,6 +688,8 @@ fn sense(agent: &Agent, terrain: &Terrain, tribe: &Tribe, food: &[Food], partner
         enemy_direction,
         enemy_distance,
         enemy_energy,
+        enemy_base_direction,
+        enemy_base_distance,
         tile_here: terrain.tile_sense(x, y, tribe_id),
         capture_progress: terrain.capture_progress_at(x, y, tribe_id),
         tile_ahead: tile_at_angle(angle),
@@ -776,7 +800,7 @@ mod tests{
         world.parents[ranking[0]] = vec![winner_brain.clone()];
         world.parents[ranking[3]] = vec![Brain::new()];
         world.agents.clear();
-        world.tribes[ranking[3]].fall();
+        world.tribes[ranking[3]].fall(0);
 
         world.end_round();
 
@@ -791,6 +815,21 @@ mod tests{
     }
 
     #[test]
+    fn nearest_enemy_base_skips_own_and_fallen_bases(){
+        let terrain = Terrain::new(MAP_ROWS, MAP_COLS, TILE_SIZE, BASE_SIZE, 1);
+        let mut tribes = Tribe::create_tribes(terrain.config());
+        let near_own_base = tribes[0].base_center(TILE_SIZE);
+        let (x, y) = (near_own_base.0 + 10.0, near_own_base.1);
+
+        assert_eq!(nearest_enemy_base(0, x, y, &tribes, TILE_SIZE), Some(tribes[1].base_center(TILE_SIZE)));
+
+        tribes[1].fall(0);
+        tribes[2].fall(0);
+        tribes[3].fall(0);
+        assert_eq!(nearest_enemy_base(0, x, y, &tribes, TILE_SIZE), None);
+    }
+
+    #[test]
     fn round_ends_after_the_step_limit_or_with_one_tribe_left(){
         assert!(!round_is_over(100, 50_000, 4));
         assert!(round_is_over(50_000, 50_000, 4));
@@ -800,7 +839,7 @@ mod tests{
     #[test]
     fn tribe_without_a_base_loses_its_agents_and_land(){
         let mut world = World::new(40, 100, 1, Mode::Demo, None, None, true);
-        world.tribes[0].fall();
+        world.tribes[0].fall(0);
         world.wipe_out(0, 1);
 
         assert!(world.agents.iter().filter(|a| a.tribe() == 0).all(|a| !a.is_alive()));
@@ -812,7 +851,30 @@ mod tests{
     }
 
     #[test]
+    fn conquerors_in_the_base_become_parents(){
+        let mut world = World::new(40, 100, 1, Mode::Demo, None, None, true);
+        let conqueror = Agent::spawn_at_tile(world.tribes[0].random_base_tile(), 1, TILE_SIZE, Brain::new());
+        let weights = conqueror.brain().weights().to_vec();
+        world.agents.push(conqueror);
+        let expected_len = world.parents[1].len() + 1;
+
+        world.tribes[0].fall(0);
+        world.wipe_out(0, 1);
+
+        assert_eq!(world.parents[1].len(), expected_len);
+        assert_eq!(world.parents[1].last().unwrap().weights(), &weights[..]);
+        assert!(world.parents[0].is_empty());
+    }
+
+    #[test]
     fn ranking_prefers_tiles_and_breaks_ties_with_living_agents(){
-        assert_eq!(rank_tribes(&[(10, 5), (30, 1), (10, 8), (0, 20)]), vec![1, 2, 0, 3]);
+        let survived = u64::MAX;
+        assert_eq!(rank_tribes(&[(survived, 10, 5), (survived, 30, 1), (survived, 10, 8), (survived, 0, 20)]), vec![1, 2, 0, 3]);
+    }
+
+    #[test]
+    fn last_tribe_on_the_map_wins_the_ranking(){
+        let survived = u64::MAX;
+        assert_eq!(rank_tribes(&[(500, 0, 0), (survived, 10, 2), (survived, 300, 9), (900, 0, 0)]), vec![2, 1, 3, 0]);
     }
 }

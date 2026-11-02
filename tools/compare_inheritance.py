@@ -38,10 +38,12 @@ METRICS = [
     ("kills", "Zabójstwa"),
     ("attacks", "Ataki"),
     ("hits", "Trafienia"),
+    ("bases_taken", "Zdobyte bazy"),
 ]
 FIRST_SEED = 1000
 SMOOTHING_WINDOW = 20
 FINAL_PART = 0.25
+PARTS = 4
 
 
 def run_simulation(seed, steps, mode):
@@ -109,18 +111,21 @@ def main():
         mode_paths = [path for job, path in zip(jobs, paths) if job[2] == mode]
         results[mode] = average_runs(mode_paths)
 
-    figure, axes = plt.subplots(6, 2, figsize=(14, 20), sharex=True)
+    rows = (len(METRICS) + 1) // 2
+    figure, axes = plt.subplots(rows, 2, figsize=(14, rows * 10 / 3), sharex=True)
     for axis, (name, title) in zip(axes.flatten(), METRICS):
         for mode in MODES:
             steps, values = results[mode]
             axis.plot(steps, smooth(values[name]), color=MODE_COLORS[mode], label=MODE_NAMES[mode])
         axis.set_title(title)
         axis.grid(alpha=0.25)
+    for axis in axes.flatten()[len(METRICS):]:
+        axis.set_visible(False)
     axes[0][0].legend()
     for axis in axes[-1]:
         axis.set_xlabel("Krok symulacji")
     figure.suptitle(f"Średnia z {seed_count} ziaren, suma plemion na 1000 kroków, wygładzone po {SMOOTHING_WINDOW} pomiarach", fontsize=11)
-    figure.tight_layout()
+    figure.tight_layout(rect=(0, 0, 1, 0.98))
     figure.savefig(output_dir / "wykres.png", dpi=110)
     print(f"Zapisano: {output_dir}")
 
@@ -132,6 +137,14 @@ def main():
             final = values[int(len(values) * (1 - FINAL_PART)):]
             cells.append(f"{mode} {sum(final) / len(final):8.2f}")
         lines.append(f"  {name:12} {'  '.join(cells)}")
+
+    # Upadki baz sa rzadkie, wiec liczy je w sumie ze wszystkich ziaren, osobno dla kazdej czesci przebiegu
+    lines.append(f"Zdobyte bazy w kolejnych {PARTS} czesciach przebiegu, suma z {seed_count} ziaren:")
+    for mode in MODES:
+        values = results[mode][1]["bases_taken"]
+        size = len(values) / PARTS
+        parts = [sum(values[int(i * size):int((i + 1) * size)]) * seed_count for i in range(PARTS)]
+        lines.append(f"  {mode:12} {'  '.join(f'{part:6.0f}' for part in parts)}")
     summary = "\n".join(lines)
     print(summary)
     (output_dir / "wyniki.txt").write_text(summary + "\n", encoding="utf-8")
