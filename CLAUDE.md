@@ -34,7 +34,7 @@ Symulacja plemion w Ruście (macroquad). Celem jest neuroewolucja: każdy agent 
 ## Stan projektu
 Zrobione: statystyki i zapis do CSV, losowa mapa, minimalna populacja plemienia, przyspieszenie, struktura `Brain` i `Action`, zmysły agenta `Senses`, wykresy z plików CSV.
 
-`Brain` to sieć neuronowa z 18 wejściami, 8 neuronami ukrytymi i 3 wyjściami (179 wag). `Senses` zawiera kierunek i odległość do najbliższego gotowego partnera z plemienia, kierunek, odległość i energię najbliższego wroga oraz kierunek i odległość do najbliższej wrogiej bazy, która jeszcze nie upadła. Modele zapisane przed dodaniem zmysłu wrogiej bazy się nie wczytają, także obecny `models/main.json`.
+`Brain` to sieć neuronowa z 19 wejściami, 8 neuronami ukrytymi i 3 wyjściami (187 wag). Agent czuje też postęp oblężenia własnej bazy (od 0 do 1). `Senses` zawiera kierunek i odległość do najbliższego gotowego partnera z plemienia, kierunek, odległość i energię najbliższego wroga oraz kierunek i odległość do najbliższej wrogiej bazy, która jeszcze nie upadła. Modele zapisane przed dodaniem zmysłu oblężenia się nie wczytają, także obecny `models/main.json`.
 
 Walka: trzecie wyjście sieci to atak na najbliższego wroga w zasięgu, można go użyć co 30 kroków i kosztuje 0,25 energii także przy pudle. Trafienie zabiera 25 energii, a połowa trafia do atakującego. Zabójca trafia na listę rodziców z szansą 25%. Wolno atakować także w cudzej bazie. Ranking plemion stawia najwyżej to, które najdłużej zostało na mapie. Między ocalałymi liczą się zajęte pola, a przy remisie żywi. Jest w panelu statystyk i na końcu przebiegu bez okna. `MIN_TRIBE_POPULATION` odradza agentów, dopóki plemię ma bazę.
 
@@ -54,6 +54,7 @@ Testy baz (`runs/comparisons/2026-11-02_*_bazy_*`, 5 ziaren po 2 mln kroków). U
 | bez nagrody | 41, 73, 45, 30 | 189 |
 | nagroda dla zdobywców | 37, 15, 24, 40 | 116 |
 | nagroda + ranking przetrwania | 56, 47, 33, 59 | 195 |
+| to samo + zmysł oblężenia | 49, 64, 64, 48 | 225 |
 
 Wniosek: bazy padają częściej niż przy losowych sieciach, ale nie coraz częściej, więc agenci nie uczą się ich zdobywać. Ostatni wariant ma najlepszą walkę (1% trafień, najwięcej zabójstw).
 

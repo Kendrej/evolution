@@ -695,6 +695,7 @@ fn sense(agent: &Agent, terrain: &Terrain, tribes: &[Tribe], food: &[Food], part
         ready_to_reproduce: if agent.is_ready_to_reproduce() { 1.0 } else { 0.0 },
         base_direction: relative_direction(x, y, angle, base_x, base_y),
         base_distance: base_distance / max_distance,
+        base_siege: tribes[tribe_id].siege_ratio(),
         food_direction,
         food_distance,
         partner_direction,
