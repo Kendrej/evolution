@@ -76,7 +76,9 @@ pub struct World{
     start_step: u64,
     start_agents: usize,
     start_food: usize,
-    round_steps: u64
+    round_steps: u64,
+    round: u64,
+    round_start: u64
 }
 
 impl World{
@@ -132,13 +134,21 @@ impl World{
             start_step,
             start_agents: num_agents,
             start_food: num_food,
-            round_steps: ROUND_STEPS
+            round_steps: ROUND_STEPS,
+            round: start_step / ROUND_STEPS,
+            round_start: start_step
         }
     }
 
     // 0 oznacza ciagly swiat bez rund
     pub fn set_round_steps(&mut self, round_steps: u64){
         self.round_steps = round_steps;
+        self.round = self.start_step / round_steps.max(1);
+    }
+
+    // Demo tylko pokazuje model, wiec nie ma w nim rund ani zdobywania baz
+    fn rounds_enabled(&self) -> bool{
+        self.mode != Mode::Demo && self.round_steps > 0
     }
 
     pub fn handle_input(&mut self){
@@ -197,6 +207,9 @@ impl World{
         }
         self.terrain.update_capture_status();
         self.resolve_attacks(&attacks);
+        if self.rounds_enabled(){
+            self.update_sieges();
+        }
 
         self.food.retain(|f| !f.eaten);
         self.agents.retain(|a| !a.is_gone());
@@ -206,8 +219,8 @@ impl World{
         self.spawn_food();
         self.record_stats();
 
-        // Demo tylko pokazuje model, wiec nie wymienia plemion
-        if self.mode != Mode::Demo && self.round_steps > 0 && self.total_steps() % self.round_steps == 0{
+        let tribes_left = self.tribes.iter().filter(|t| !t.is_extinct()).count();
+        if self.rounds_enabled() && round_is_over(self.total_steps() - self.round_start, self.round_steps, tribes_left){
             self.end_round();
         }
 
@@ -222,17 +235,21 @@ impl World{
 
     // Plemiona dostaja wagi wedlug rankingu i zaczynaja od nowa na nowej mapie
     fn end_round(&mut self){
-        let finished_round = self.total_steps() / self.round_steps.max(1);
+        self.round += 1;
         let ranking = self.ranking();
-        println!("Runda {}: wygralo plemie {}, pola {}", finished_round, ranking[0] + 1, self.terrain.owned_tiles(ranking[0]));
+        println!("Runda {}: wygralo plemie {}, pola {}, kroki rundy {}", self.round, ranking[0] + 1, self.terrain.owned_tiles(ranking[0]), self.total_steps() - self.round_start);
 
         let sources = next_round_sources(&ranking);
         let pools: Vec<Vec<Brain>> = sources.iter().map(|&source| self.gene_pool(source)).collect();
         self.parents = sources.iter().map(|&source| self.parents[source].clone()).collect();
 
-        self.terrain = Terrain::new(MAP_ROWS, MAP_COLS, TILE_SIZE, BASE_SIZE, self.seed.wrapping_add(finished_round as u32));
+        self.terrain = Terrain::new(MAP_ROWS, MAP_COLS, TILE_SIZE, BASE_SIZE, self.seed.wrapping_add(self.round as u32));
         self.food = starting_food(&self.terrain, self.start_food);
         self.agents.clear();
+        self.round_start = self.total_steps();
+        for tribe in &mut self.tribes{
+            tribe.restore();
+        }
 
         let agents_per_tribe = self.start_agents / self.tribes.len();
         for (tribe, pool) in pools.iter().enumerate(){
@@ -249,6 +266,37 @@ impl World{
             .filter(|a| a.is_alive() && a.tribe() == tribe)
             .map(|a| a.brain().clone());
         self.parents[tribe].iter().cloned().chain(living).collect()
+    }
+
+    fn update_sieges(&mut self){
+        for i in 0..self.tribes.len(){
+            let mut in_base = vec![0usize; self.tribes.len()];
+            for a in self.agents.iter().filter(|a| a.is_alive() && self.terrain.is_base_of(a.get_x(), a.get_y(), i)){
+                in_base[a.tribe()] += 1;
+            }
+            let defenders = in_base[i] > 0;
+            in_base[i] = 0;
+            let enemies = in_base.iter().any(|&count| count > 0);
+
+            if self.tribes[i].update_siege(enemies, defenders){
+                // Baze zdobywa plemie, ktore ma w niej najwiecej agentow
+                let conqueror = (0..in_base.len()).max_by_key(|&tribe| in_base[tribe]).unwrap_or(i);
+                self.wipe_out(i, conqueror);
+            }
+        }
+    }
+
+    // Plemie, ktore stracilo baze, wymiera do konca rundy, a jego ziemie staja sie neutralne
+    fn wipe_out(&mut self, tribe: usize, conqueror: usize){
+        println!("Plemie {} stracilo baze na rzecz plemienia {} w kroku {}", tribe + 1, conqueror + 1, format_steps(self.total_steps()));
+        self.stats.add_base_taken(conqueror);
+        for a in &mut self.agents{
+            if a.is_alive() && a.tribe() == tribe{
+                a.die();
+                self.stats.add_death(tribe, a.age());
+            }
+        }
+        self.terrain.release_tiles(tribe);
     }
 
     fn resolve_attacks(&mut self, attacks: &[(usize, usize)]){
@@ -348,7 +396,7 @@ impl World{
         let steps = if self.mode == Mode::Demo {
             format!("Model: {} krokow", format_steps(self.start_step))
         } else {
-            format!("Runda {}, kroki: {}", self.total_steps() / self.round_steps.max(1) + 1, format_steps(self.total_steps()))
+            format!("Runda {}, kroki: {}", self.round + 1, format_steps(self.total_steps()))
         };
         draw_rectangle(STATS_BUTTON_WIDTH + 150.0, 0.0, 300.0, STATS_BUTTON_HEIGHT, panel_color);
         draw_text(&steps, STATS_BUTTON_WIDTH + 160.0, 18.0, 20.0, WHITE);
@@ -389,6 +437,10 @@ impl World{
         let tile_size = self.terrain.config().tile_size;
 
         for (i, tribe) in self.tribes.iter().enumerate(){
+            // Oblezona baza nie przyjmuje nowych agentow, inaczej nie dalo by sie jej zdobyc
+            if tribe.is_extinct() || tribe.is_besieged(){
+                continue;
+            }
             let alive: Vec<usize> = (0..self.agents.len())
                 .filter(|&index| self.agents[index].is_alive() && self.agents[index].tribe() == i)
                 .collect();
@@ -468,6 +520,7 @@ impl World{
         set_camera(&self.camera);
 
         self.terrain.draw();
+        self.draw_sieges();
 
         for a in &self.agents{
             a.draw(self.tribes[a.tribe()].color());
@@ -481,6 +534,24 @@ impl World{
 
         self.draw_stats();
     }
+
+    // Upadla baza jest przyciemniona, a oblezona ma pasek postepu oblezenia
+    fn draw_sieges(&self){
+        for tribe in &self.tribes{
+            let rect = tribe.base_rect(TILE_SIZE);
+            if tribe.is_extinct(){
+                draw_rectangle(rect.x, rect.y, rect.w, rect.h, Color::from_rgba(0, 0, 0, 160));
+            }
+            else if tribe.siege_ratio() > 0.0{
+                draw_rectangle(rect.x, rect.y, rect.w * tribe.siege_ratio(), 5.0, WHITE);
+            }
+        }
+    }
+}
+
+// Runda konczy sie po limicie krokow albo gdy zostalo tylko jedno plemie
+fn round_is_over(steps_in_round: u64, round_steps: u64, tribes_left: usize) -> bool{
+    steps_in_round >= round_steps || tribes_left <= 1
 }
 
 fn starting_food(terrain: &Terrain, count: usize) -> Vec<Food>{
@@ -705,9 +776,11 @@ mod tests{
         world.parents[ranking[0]] = vec![winner_brain.clone()];
         world.parents[ranking[3]] = vec![Brain::new()];
         world.agents.clear();
+        world.tribes[ranking[3]].fall();
 
         world.end_round();
 
+        assert!(world.tribes.iter().all(|t| !t.is_extinct()));
         assert_eq!(world.agents.len(), 40);
         assert_eq!(world.food.len(), 100);
         assert_eq!(world.parents[ranking[3]][0].weights(), winner_brain.weights());
@@ -715,6 +788,27 @@ mod tests{
             .filter(|a| a.tribe() == ranking[3])
             .all(|a| a.brain().weights() == winner_brain.weights()));
         assert!((0..4).all(|tribe| world.terrain.owned_tiles(tribe) == BASE_SIZE * BASE_SIZE));
+    }
+
+    #[test]
+    fn round_ends_after_the_step_limit_or_with_one_tribe_left(){
+        assert!(!round_is_over(100, 50_000, 4));
+        assert!(round_is_over(50_000, 50_000, 4));
+        assert!(round_is_over(100, 50_000, 1));
+    }
+
+    #[test]
+    fn tribe_without_a_base_loses_its_agents_and_land(){
+        let mut world = World::new(40, 100, 1, Mode::Demo, None, None, true);
+        world.tribes[0].fall();
+        world.wipe_out(0, 1);
+
+        assert!(world.agents.iter().filter(|a| a.tribe() == 0).all(|a| !a.is_alive()));
+        assert!(world.agents.iter().filter(|a| a.tribe() == 1).all(|a| a.is_alive()));
+        assert_eq!(world.terrain.owned_tiles(0), 0);
+
+        world.respawn_tribes();
+        assert!(world.agents.iter().filter(|a| a.tribe() == 0).all(|a| !a.is_alive()));
     }
 
     #[test]

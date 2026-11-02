@@ -110,7 +110,7 @@ impl Agent{
         false
     }
 
-    fn die(&mut self){
+    pub fn die(&mut self){
         self.energy = 0.0;
         self.timer_of_death += 1;
         self.alive = false;

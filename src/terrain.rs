@@ -244,6 +244,15 @@ impl Terrain{
         self.tiles.iter().flatten().filter(|tile| tile.owner == Some(tribe)).count()
     }
 
+    // Ziemie wymarlego plemienia, razem z baza, staja sie neutralne
+    pub fn release_tiles(&mut self, tribe: usize){
+        for tile in self.tiles.iter_mut().flatten(){
+            if tile.owner == Some(tribe){
+                tile.owner = None;
+            }
+        }
+    }
+
     pub fn owner_at(&self, x: f32, y: f32) -> Option<usize>{
         let row = (y / self.config.tile_size) as usize;
         let col = (x / self.config.tile_size) as usize;

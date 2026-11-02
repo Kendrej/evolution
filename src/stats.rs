@@ -17,6 +17,7 @@ struct TribeStats{
     kills: u32,
     attacks: u32,
     hits: u32,
+    bases_taken: u32,
     births: u32,
     deaths: u32,
     respawns: u32,
@@ -56,7 +57,7 @@ impl Stats{
             .and_then(|_| File::create(&path))
             .and_then(|file| {
                 let mut writer = BufWriter::new(file);
-                writeln!(writer, "step,tribe,alive,births,deaths,respawns,avg_lifetime,food_eaten,owned_tiles,in_base,ready_in_base,ready,kills,attacks,hits")?;
+                writeln!(writer, "step,tribe,alive,births,deaths,respawns,avg_lifetime,food_eaten,owned_tiles,in_base,ready_in_base,ready,kills,attacks,hits,bases_taken")?;
                 writer.flush()?;
                 Ok(writer)
             });
@@ -102,6 +103,10 @@ impl Stats{
         self.tribes[tribe].hits += 1;
     }
 
+    pub fn add_base_taken(&mut self, tribe: usize){
+        self.tribes[tribe].bases_taken += 1;
+    }
+
     pub fn add_food(&mut self, tribe: usize){
         self.tribes[tribe].food_eaten += 1;
     }
@@ -120,7 +125,7 @@ impl Stats{
         };
 
         if let Some(file) = &mut self.file{
-            let row = format!("{},{},{},{},{},{},{:.1},{},{},{},{},{},{},{},{}", self.step, tribe, alive, t.births, t.deaths, t.respawns, avg_lifetime, t.food_eaten, owned_tiles, in_base, ready_in_base, ready, t.kills, t.attacks, t.hits);
+            let row = format!("{},{},{},{},{},{},{:.1},{},{},{},{},{},{},{},{},{}", self.step, tribe, alive, t.births, t.deaths, t.respawns, avg_lifetime, t.food_eaten, owned_tiles, in_base, ready_in_base, ready, t.kills, t.attacks, t.hits, t.bases_taken);
             if let Err(e) = writeln!(file, "{}", row).and_then(|_| file.flush()){
                 eprintln!("Nie udalo sie zapisac statystyk: {}", e);
                 self.file = None;
@@ -135,6 +140,7 @@ impl Stats{
         t.kills = 0;
         t.attacks = 0;
         t.hits = 0;
+        t.bases_taken = 0;
     }
 
     pub fn step(&self) -> u64{

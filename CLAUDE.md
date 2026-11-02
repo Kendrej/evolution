@@ -11,7 +11,8 @@ Symulacja plemion w Ruście (macroquad). Celem jest neuroewolucja: każdy agent 
 
 ## Założenia
 - Teraz liczy się dobra podstawa pod sieć, a nie dopracowane zachowanie. Decyzje agentów mają dać się łatwo zastąpić siecią.
-- Agenci rozmnażają się, gdy dwaj z tego samego plemienia dotkną się na polu należącym do plemienia, także w bazie. Baza nie jest już do tego konieczna, więc poza odradzaniem ma małe znaczenie i trzeba do niej wrócić w koncepcji.
+- Agenci rozmnażają się, gdy dwaj z tego samego plemienia dotkną się na polu należącym do plemienia, także w bazie.
+- Baza to serce plemienia: jej utrata oznacza wymarcie plemienia do końca rundy.
 - W bazach nie ma jedzenia. Jedzenie z pola zajętego może zjeść tylko właściciel, a z neutralnego każdy.
 
 ## Uruchamianie
@@ -38,6 +39,8 @@ Walka: trzecie wyjście sieci to atak na najbliższego wroga w zasięgu, można 
 
 Rundy: co 50 000 kroków (poza demo) powstaje nowa mapa i nowe jedzenie, a każde plemię zaczyna od 10 agentów w bazie. Wagi bierze z listy rodziców i żywych swojego plemienia, z mutacją, ale ostatnie w rankingu dostaje wagi i listę rodziców zwycięzcy. W CSV `owned_tiles` i `alive` spadają więc na początku każdej rundy.
 
+Zdobywanie baz (tylko w treningu z rundami): gdy w bazie są wrogowie, a nie ma obrońców, oblężenie rośnie o 1 na krok, a w każdej innej sytuacji spada o 1. Po 600 krokach baza upada. Plemię ginie wtedy do końca rundy, jego pola stają się neutralne, a baza zostaje przyciemniona. Zdobywcą jest plemię z największą liczbą agentów w bazie, co trafia do kolumny `bases_taken` w CSV. Oblężona baza nie przyjmuje odrodzeń. Runda kończy się wcześniej, gdy zostanie jedno plemię. Pierwszy test (ziarno 1001, 300 000 kroków) dał 4 upadki baz w 6 rundach, choć agenci nie widzą wrogich baz.
+
 Dzieci dziedziczą wagi po rodzicach z mutacją. W treningu odrodzeni agenci dostają wagi z listy 20 ostatnich rodziców swojego plemienia, z mutacją, a przy pustej liście nową, losową sieć. Lista jest zapisywana w modelu.
 
 Stare modele usunięto przy dodaniu zmysłu partnera, więc `models/main.json` powstanie dopiero po oznaczeniu nowej populacji gwiazdką.
@@ -59,6 +62,6 @@ Rozmnażanie na własnych polach (`2026-11-01_20-52_dlugi_wlasne_pola`, ostatnie
 Rundy wobec ciągłego świata (`2026-11-01_22-23_rundy_dlugi`, 5 ziaren po 2 000 000 kroków, potem mecze po 100 000 kroków w obie strony na 3 nowych mapach): rundy 50 000 wygrały 15/15 (pola 69018 wobec 17450), 100 000 i 200 000 po 12/15, oba przegrywając na ziarnie 1001. Mecz przypomina start rundy, więc format sprzyja modelom z rund. Około 1% ataków nadal trafia.
 
 ## Następne kroki
-1. Rola bazy: poza odradzaniem ma małe znaczenie i trzeba ją przemyśleć.
-2. Wymieranie plemion z końcem rundy po wybiciu rywali i zachowywanie najlepszych modeli.
+1. Zmysł kierunku do najbliższej wrogiej bazy (2 nowe wejścia, trening od nowa) i pomiar, czy agenci uczą się atakować bazy.
+2. Zachowywanie najlepszych modeli z rund.
 3. Cechy agentów dopiero po działających rundach.
