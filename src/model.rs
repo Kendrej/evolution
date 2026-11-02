@@ -13,6 +13,7 @@ const MAIN_FILE: &str = "main.json";
 const LATEST_FILE: &str = "latest.json";
 const FINAL_FILE: &str = "final.json";
 const NAME_FILE: &str = "name.txt";
+const ROUNDS_DIR: &str = "rounds";
 const MATCH_TRIBE_SIZE: usize = 10;
 
 // Zapisana populacja: wagi wszystkich zywych agentow, osobno dla kazdego plemienia.
@@ -265,6 +266,15 @@ impl ModelSaver{
         self.save(model, FINAL_FILE);
     }
 
+    // Zwyciezca kazdej rundy zostaje w osobnym pliku, zeby mozna go bylo pozniej wyciagnac,
+    // np. do meczu. Nie zmienia glownego modelu.
+    pub fn save_round(&self, round: u64, model: &Model){
+        let path = self.dir.join(ROUNDS_DIR).join(format!("round_{:04}.json", round));
+        if let Err(e) = model.save(&path){
+            eprintln!("Nie udalo sie zapisac zwyciezcy rundy: {}", e);
+        }
+    }
+
     pub fn final_path(&self) -> PathBuf{
         self.dir.join(FINAL_FILE)
     }
@@ -467,6 +477,22 @@ mod tests{
         assert!(!entries[0].starred);
         assert_eq!(entries[0].name, "Glowna");
         assert!(!store.main_path().exists());
+        fs::remove_dir_all(&store.root).unwrap();
+    }
+
+    #[test]
+    fn round_winner_is_saved_apart_from_the_main_model(){
+        let store = test_store("round");
+        let population = store.new_population(1, "inherit", "Pierwsza");
+        population.save_latest(&sample_model(10));
+        store.set_main(&store.list()[0]).unwrap();
+
+        population.save_round(3, &sample_model(50));
+
+        let saved = Model::load(&population.dir.join(ROUNDS_DIR).join("round_0003.json")).unwrap();
+        assert_eq!(saved.step, 50);
+        assert_eq!(Model::load(&store.main_path()).unwrap().step, 10);
+        assert_eq!(store.list().len(), 1);
         fs::remove_dir_all(&store.root).unwrap();
     }
 

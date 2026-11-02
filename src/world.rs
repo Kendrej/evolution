@@ -239,6 +239,10 @@ impl World{
         let ranking = self.ranking();
         println!("Runda {}: wygralo plemie {}, pola {}, kroki rundy {}", self.round, ranking[0] + 1, self.terrain.owned_tiles(ranking[0]), self.total_steps() - self.round_start);
 
+        if let Some(saver) = &self.saver{
+            saver.save_round(self.round, &self.winner_model(ranking[0]));
+        }
+
         let sources = next_round_sources(&ranking);
         let pools: Vec<Vec<Brain>> = sources.iter().map(|&source| self.gene_pool(source)).collect();
         self.parents = sources.iter().map(|&source| self.parents[source].clone()).collect();
@@ -367,6 +371,16 @@ impl World{
             name: String::new(),
             source: String::new()
         }
+    }
+
+    // Model z samym zwyciezca: jego zywi agenci i lista rodzicow, pozostale plemiona puste
+    fn winner_model(&self, winner: usize) -> Model{
+        let mut model = self.to_model();
+        for tribe in (0..model.tribes.len()).filter(|&tribe| tribe != winner){
+            model.tribes[tribe].clear();
+            model.parents[tribe].clear();
+        }
+        model
     }
 
     pub fn save_latest(&self){
@@ -827,6 +841,19 @@ mod tests{
         tribes[2].fall(0);
         tribes[3].fall(0);
         assert_eq!(nearest_enemy_base(0, x, y, &tribes, TILE_SIZE), None);
+    }
+
+    #[test]
+    fn winner_model_keeps_only_the_winning_tribe(){
+        let mut world = World::new(40, 100, 1, Mode::Demo, None, None, true);
+        world.parents[2] = vec![Brain::new()];
+        world.parents[3] = vec![Brain::new()];
+
+        let model = world.winner_model(2);
+
+        assert_eq!(model.tribes[2].len(), 10);
+        assert_eq!(model.parents[2].len(), 1);
+        assert!([0, 1, 3].iter().all(|&tribe| model.tribes[tribe].is_empty() && model.parents[tribe].is_empty()));
     }
 
     #[test]

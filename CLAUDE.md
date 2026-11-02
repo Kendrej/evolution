@@ -19,6 +19,7 @@ Symulacja plemion w Ruście (macroquad). Celem jest neuroewolucja: każdy agent 
 - `cargo run --release` do dłuższych przebiegów. Spacja zmienia prędkość symulacji (x1, x10, x50, x100).
 - Po starcie menu pozwala wybrać trening (nowa populacja albo zapisany model) lub demo (oglądanie modelu bez nauki i bez zapisu). Esc w trakcie, po potwierdzeniu, wraca do menu.
 - Modele to wagi żywych agentów z podziałem na plemiona, zapisywane co 50 000 kroków. Każda nazwana populacja ma folder `models/<czas>_seed_<ziarno>_<tryb>/`, a kontynuacja treningu zapisuje do tego samego folderu.
+- Zwycięzca każdej rundy zapisuje się w `rounds/round_<numer>.json` w folderze populacji. Plik ma tylko zwycięskie plemię i nadaje się do `--match`.
 - Gwiazdka w menu oznacza model główny. Jego kopia to `models/main.json`, jedyny model w gicie, aktualizowany przy każdym zapisie tej populacji. Foldery populacji są poza repozytorium.
 - Przebiegi bez okna zapisują się w `models/comparisons/`, nie ma ich w menu i nie zmieniają modelu głównego.
 - Ziarno jest losowe. Żeby powtórzyć przebieg, ustaw `FIXED_SEED` w `src/main.rs`.
@@ -77,6 +78,4 @@ Rozmnażanie na własnych polach (`2026-11-01_20-52_dlugi_wlasne_pola`, ostatnie
 Rundy wobec ciągłego świata (`2026-11-01_22-23_rundy_dlugi`, 5 ziaren po 2 000 000 kroków, potem mecze po 100 000 kroków w obie strony na 3 nowych mapach): rundy 50 000 wygrały 15/15 (pola 69018 wobec 17450), 100 000 i 200 000 po 12/15, oba przegrywając na ziarnie 1001. Mecz przypomina start rundy, więc format sprzyja modelom z rund. Około 1% ataków nadal trafia.
 
 ## Następne kroki
-1. Mocniejszy dobór plemion, np. wszystkie wymarłe plemiona dostają w następnej rundzie wagi zwycięzcy, a nie tylko ostatnie.
-2. Zachowywanie najlepszych modeli z rund.
-3. Cechy agentów dopiero po działających rundach.
+1. Cechy agentów dopiero po działających rundach.
