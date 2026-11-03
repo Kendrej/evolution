@@ -37,6 +37,8 @@ Zrobione: statystyki i zapis do CSV, losowa mapa, minimalna populacja plemienia,
 
 `Brain` to sieć neuronowa z 19 wejściami, 8 neuronami ukrytymi i 3 wyjściami (187 wag). Agent czuje też postęp oblężenia własnej bazy (od 0 do 1). `Senses` zawiera kierunek i odległość do najbliższego gotowego partnera z plemienia, kierunek, odległość i energię najbliższego wroga oraz kierunek i odległość do najbliższej wrogiej bazy, która jeszcze nie upadła. Modele zapisane przed dodaniem zmysłu oblężenia się nie wczytają, także obecny `models/main.json`.
 
+Nowe wejścia dopisujemy tylko na końcu `Senses::to_inputs`. Wtedy `Model::load` dopełnia wagi starszego modelu zerami (`pad_weights` w `src/brain.rs`) i model decyduje tak samo jak przedtem. Działa to dla modeli z co najmniej 19 wejściami (`FIXED_ORDER_INPUTS`).
+
 Walka: trzecie wyjście sieci to atak na najbliższego wroga w zasięgu, można go użyć co 30 kroków i kosztuje 0,25 energii także przy pudle. Trafienie zabiera 25 energii, a połowa trafia do atakującego. Zabójca trafia na listę rodziców z szansą 25%. Wolno atakować także w cudzej bazie. Ranking plemion stawia najwyżej to, które najdłużej zostało na mapie. Między ocalałymi liczą się zajęte pola, a przy remisie żywi. Jest w panelu statystyk i na końcu przebiegu bez okna. `MIN_TRIBE_POPULATION` odradza agentów, dopóki plemię ma bazę.
 
 Rundy: co 50 000 kroków (poza demo) powstaje nowa mapa i nowe jedzenie, a każde plemię zaczyna od 10 agentów w bazie. Wagi bierze z listy rodziców i żywych swojego plemienia, z mutacją, ale ostatnie w rankingu dostaje wagi i listę rodziców zwycięzcy. W CSV `owned_tiles` i `alive` spadają więc na początku każdej rundy.

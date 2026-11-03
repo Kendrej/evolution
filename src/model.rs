@@ -3,7 +3,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::brain::WEIGHT_COUNT;
+use crate::brain::{WEIGHT_COUNT, pad_weights};
 use crate::tribe::TRIBE_COLORS;
 use macroquad::rand::gen_range;
 
@@ -66,15 +66,16 @@ impl Model{
 
     pub fn load(path: &Path) -> Result<Model, String>{
         let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
-        let model: Model = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+        let mut model: Model = serde_json::from_str(&text).map_err(|e| e.to_string())?;
 
         if model.tribes.len() != TRIBE_COLORS.len(){
             return Err(format!("Zla liczba plemion: {}", model.tribes.len()));
         }
-        if model.weight_count != WEIGHT_COUNT
-            || model.tribes.iter().chain(&model.parents).flatten().any(|weights| weights.len() != WEIGHT_COUNT){
-            return Err(format!("Model pasuje do innej sieci, oczekiwano {} wag", WEIGHT_COUNT));
+        // Model sprzed dodania wejscia dostaje zerowe wagi dla nowych wejsc
+        for weights in model.tribes.iter_mut().chain(model.parents.iter_mut()).flatten(){
+            *weights = pad_weights(weights).ok_or_else(|| format!("Model pasuje do innej sieci, oczekiwano {} wag", WEIGHT_COUNT))?;
         }
+        model.weight_count = WEIGHT_COUNT;
         Ok(model)
     }
 }

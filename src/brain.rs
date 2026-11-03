@@ -2,6 +2,9 @@ use macroquad::rand::gen_range;
 use std::f32::consts::{PI, TAU};
 
 const INPUTS: usize = 19;
+// Od tylu wejsc ich kolejnosc jest stala. Nowe wejscia dopisujemy tylko na koncu Senses::to_inputs,
+// wtedy starsze modele wczytuja sie z zerowymi wagami nowych wejsc.
+const FIXED_ORDER_INPUTS: usize = 19;
 const HIDDEN: usize = 8;
 const OUTPUTS: usize = 3;
 // Kazdy neuron ma wage na kazde wejscie i jedna dodatkowa stala (bias)
@@ -156,6 +159,32 @@ fn activate(inputs: &[f32], weights: &[f32]) -> f32{
     sum.tanh()
 }
 
+// Dopelnia zerami wagi modelu z mniejsza liczba wejsc, wiec stary model decyduje tak samo jak wczesniej.
+// Zwraca None, gdy wagi nie pasuja do sieci.
+pub fn pad_weights(weights: &[f32]) -> Option<Vec<f32>>{
+    pad_weights_from(weights, FIXED_ORDER_INPUTS)
+}
+
+fn pad_weights_from(weights: &[f32], min_inputs: usize) -> Option<Vec<f32>>{
+    let hidden_part = weights.len().checked_sub((HIDDEN + 1) * OUTPUTS)?;
+    if hidden_part % HIDDEN != 0{
+        return None;
+    }
+    let old_inputs = (hidden_part / HIDDEN).checked_sub(1)?;
+    if !(min_inputs..=INPUTS).contains(&old_inputs){
+        return None;
+    }
+
+    let (hidden_weights, output_weights) = weights.split_at(hidden_part);
+    let mut padded = Vec::with_capacity(WEIGHT_COUNT);
+    for neuron in hidden_weights.chunks(old_inputs + 1){
+        padded.extend_from_slice(neuron);
+        padded.extend(std::iter::repeat_n(0.0, INPUTS - old_inputs));
+    }
+    padded.extend_from_slice(output_weights);
+    Some(padded)
+}
+
 pub fn relative_direction(x: f32, y: f32, angle: f32, target_x: f32, target_y: f32) -> f32{
     let target_angle = (target_y - y).atan2(target_x - x);
     ((target_angle - angle + PI).rem_euclid(TAU) - PI) / PI
@@ -281,6 +310,36 @@ mod tests{
         assert_close(brain.decide(&senses(0.5)).speed, 0.0);
         brain.weights[speed_bias] = 10.0;
         assert_close(brain.decide(&senses(0.5)).speed, 1.0);
+    }
+
+    #[test]
+    fn padded_old_network_ignores_the_new_input(){
+        let old_inputs = INPUTS - 1;
+        let old: Vec<f32> = (0..(old_inputs + 1) * HIDDEN + (HIDDEN + 1) * OUTPUTS).map(|_| gen_range(-1.0, 1.0)).collect();
+        let padded = pad_weights_from(&old, old_inputs).unwrap();
+
+        assert_eq!(padded.len(), WEIGHT_COUNT);
+        assert_eq!(padded[..old_inputs + 1], old[..old_inputs + 1]);
+        assert_eq!(padded[old_inputs + 1], 0.0);
+
+        // Ostatnie wejscie ma zerowe wagi, wiec jego wartosc nie zmienia decyzji
+        let brain = Brain::from_weights(&padded);
+        let mut other = senses(0.5);
+        other.tile_right = -1.0;
+        let first = brain.decide(&senses(0.5));
+        let second = brain.decide(&other);
+        assert_eq!(first.turn, second.turn);
+        assert_eq!(first.speed, second.speed);
+        assert_eq!(first.attack, second.attack);
+    }
+
+    #[test]
+    fn current_weights_stay_and_older_input_order_is_rejected(){
+        let current: Vec<f32> = (0..WEIGHT_COUNT).map(|i| i as f32).collect();
+        assert_eq!(pad_weights(&current).unwrap(), current);
+
+        // 16 wejsc mial models/main.json, zanim zmysly wstawiono w srodek listy
+        assert!(pad_weights(&vec![0.0; 17 * HIDDEN + (HIDDEN + 1) * OUTPUTS]).is_none());
     }
 
     #[test]
