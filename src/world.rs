@@ -72,6 +72,8 @@ pub struct World{
     mode: Mode,
     saved_brains: Vec<Vec<Brain>>,
     parents: Vec<Vec<Brain>>,
+    // Tylko do pomiaru: czy rodzic na tym samym miejscu listy to zdobywca bazy
+    parent_conquerors: Vec<Vec<bool>>,
     saver: Option<ModelSaver>,
     seed: u32,
     start_step: u64,
@@ -103,6 +105,7 @@ impl World{
         for (pool, saved) in parents.iter_mut().zip(model.iter().flat_map(|m| &m.parents)){
             *pool = saved.iter().map(|weights| Brain::from_weights(weights)).collect();
         }
+        let parent_conquerors = parents.iter().map(|pool| vec![false; pool.len()]).collect();
 
         if model.is_some(){
             for (tribe, brains) in saved_brains.iter().enumerate(){
@@ -132,6 +135,7 @@ impl World{
             mode,
             saved_brains,
             parents,
+            parent_conquerors,
             saver,
             seed,
             start_step,
@@ -264,6 +268,7 @@ impl World{
         let sources = next_round_sources(&ranking);
         let pools: Vec<Vec<Brain>> = sources.iter().map(|&source| self.gene_pool(source)).collect();
         self.parents = sources.iter().map(|&source| self.parents[source].clone()).collect();
+        self.parent_conquerors = sources.iter().map(|&source| self.parent_conquerors[source].clone()).collect();
 
         self.terrain = Terrain::new(MAP_ROWS, MAP_COLS, TILE_SIZE, BASE_SIZE, self.seed.wrapping_add(self.round as u32));
         self.food = starting_food(&self.terrain, self.start_food);
@@ -318,6 +323,7 @@ impl World{
         for a in &self.agents{
             if a.is_alive() && a.tribe() != tribe && self.terrain.is_base_of(a.get_x(), a.get_y(), tribe){
                 remember_parent(&mut self.parents[a.tribe()], a.brain());
+                mark_parent(&mut self.parent_conquerors[a.tribe()], true);
             }
         }
         for a in &mut self.agents{
@@ -355,6 +361,7 @@ impl World{
                 // lista zapelniala sie zabojcami i agenci przestawali sie rozmnazac.
                 if rand::gen_range(0.0, 1.0) < KILLER_PARENT_CHANCE{
                     remember_parent(&mut self.parents[attacker.tribe()], attacker.brain());
+                    mark_parent(&mut self.parent_conquerors[attacker.tribe()], false);
                 }
             }
         }
@@ -479,7 +486,8 @@ impl World{
                 .collect();
             let ready_in_base = in_base.iter().filter(|a| a.is_ready_to_reproduce()).count();
             let ready = self.agents.iter().filter(|a| a.tribe() == i && a.is_ready_to_reproduce()).count();
-            self.stats.write_row(i, alive, self.terrain.owned_tiles(i), in_base.len(), ready_in_base, ready);
+            let conqueror_parents = self.parent_conquerors[i].iter().filter(|&&conqueror| conqueror).count();
+            self.stats.write_row(i, alive, self.terrain.owned_tiles(i), in_base.len(), ready_in_base, ready, conqueror_parents);
         }
     }
 
@@ -534,6 +542,9 @@ impl World{
                     let pool = &mut self.parents[a.tribe()];
                     remember_parent(pool, a.brain());
                     remember_parent(pool, b.brain());
+                    let flags = &mut self.parent_conquerors[a.tribe()];
+                    mark_parent(flags, false);
+                    mark_parent(flags, false);
                     children.push(a.reproduce_with(b, tile_size, brain));
                 }
             }
@@ -656,6 +667,14 @@ fn remember_parent(pool: &mut Vec<Brain>, brain: &Brain){
         pool.remove(0);
     }
     pool.push(brain.clone());
+}
+
+// Przesuwa znaczniki zdobywcow tak samo jak remember_parent przesuwa liste rodzicow
+fn mark_parent(flags: &mut Vec<bool>, conqueror: bool){
+    if flags.len() >= PARENT_POOL_SIZE{
+        flags.remove(0);
+    }
+    flags.push(conqueror);
 }
 
 struct ReadyAgent{

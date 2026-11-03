@@ -110,5 +110,27 @@ Liczba neuronów ukrytych (stała `HIDDEN` w `src/brain.rs`), 2 serie po 5 ziare
 
 Wniosek: druga seria nie potwierdziła pierwszej (8 neuronów wypadło w niej najlepiej). Wyniki zależą głównie od pojedynczych ziaren, które dają ponad 100 upadków. Pewne jest tylko to, że 32 neurony są najsłabsze w obu seriach, a zmiana liczby neuronów nie daje pewnej poprawy.
 
+Zdobywcy na liście rodziców (kolumna `conqueror_parents` w CSV, średnio na plemię, 2 mln kroków, 8 neuronów):
+
+| ziarno | upadki baz | narodziny | zdobywcy na liście | znikają po (mediana) |
+|---|---|---|---|---|
+| 2029 | 23 | 8408 | 0,07 / 20 | 12 000 kroków |
+| 2028 | 36 | 5161 | 0,11 / 20 | 17 000 kroków |
+| 2033 | 67 | 1342 | 0,65 / 20 | 67 000 kroków |
+| 2035 | 135 | 2128 | 1,28 / 20 | 56 000 kroków |
+| 2027 | 176 | 2802 | 1,14 / 20 | 36 000 kroków |
+
+Wniosek: zdobywcy to najwyżej kilka procent listy, a gdzie jest dużo narodzin, rodzice z rozmnażania wypychają ich szybko i bazy padają rzadko.
+
+Długi trening, 10 mln kroków (ok. 200 rund), te same 5 ziaren, suma w odcinkach po 2 mln kroków:
+
+| odcinek | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| upadki baz | 437 | 602 | 411 | 167 | 92 |
+
+Narodziny rosną na każdym ziarnie do 12–15 tys. na odcinek, a trafienia do 0,7–2,3%. Wniosek: sama selekcja plemion prowadzi do rozmnażania, a nie do zdobywania baz. Nie wiadomo jeszcze, czy bazy padają rzadziej przez słabszy atak, czy przez lepszą obronę.
+
+Mecze z oblężeniami, model po 10 mln wobec modelu z tego samego ziarna po 2 mln (5 ziaren, 3 mapy, obie strony, 30 meczów): 10 mln wygrał 27/30, choć zdobył mniej baz (15 wobec 24). Wniosek: dłuższy trening daje lepszą obronę i przetrwanie, a nie lepszy atak.
+
 ## Następne kroki
 1. Cechy agentów dopiero po działających rundach.
