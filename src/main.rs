@@ -144,6 +144,7 @@ fn run_match(args: &[String]) -> Result<(), String>{
     rand::srand(seed as u64);
     let duel = Model::for_match(&first, &second);
     let mut world = World::new(40, 100, seed, Mode::Demo, Some(duel), None, true);
+    world.enable_match_sieges();
     for _ in 0..steps{
         world.update();
     }

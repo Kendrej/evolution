@@ -29,7 +29,8 @@ Symulacja plemion w Ruście (macroquad). Celem jest neuroewolucja: każdy agent 
 - `python tools/plot_run.py` ręcznie rysuje wykresy ostatniego treningu i zapisuje PNG obok pliku CSV. Wymaga `matplotlib`.
 - `python tools/compare_inheritance.py <kroki> <liczba_ziaren> <opis>` uruchamia porównanie.
 - `python tools/compare_rounds.py <kroki> <liczba_ziaren> <opis>` trenuje warianty długości rundy i ciągły świat, a potem wystawia ich modele w meczach bez nauki.
-- Bez okna: `--headless <ziarno> <kroki> <inherit|random> [kroki_rundy, 0 to bez rund]` oraz `--match <model_1> <model_2> <ziarno> <kroki>`.
+- Bez okna: `--headless <ziarno> <kroki> <inherit|random> [kroki_rundy, 0 to bez rund]` oraz `--match <model_1> <model_2> <ziarno> <kroki>`. Mecz jest bez nauki, ale z oblężeniami baz.
+- W oknie trafienie widać jako czerwoną linię do celu, a pudło jako blady okrąg wokół atakującego (przez 30 kroków).
 
 ## Stan projektu
 Zrobione: statystyki i zapis do CSV, losowa mapa, minimalna populacja plemienia, przyspieszenie, struktura `Brain` i `Action`, zmysły agenta `Senses`, wykresy z plików CSV.
@@ -40,7 +41,7 @@ Walka: trzecie wyjście sieci to atak na najbliższego wroga w zasięgu, można 
 
 Rundy: co 50 000 kroków (poza demo) powstaje nowa mapa i nowe jedzenie, a każde plemię zaczyna od 10 agentów w bazie. Wagi bierze z listy rodziców i żywych swojego plemienia, z mutacją, ale ostatnie w rankingu dostaje wagi i listę rodziców zwycięzcy. W CSV `owned_tiles` i `alive` spadają więc na początku każdej rundy.
 
-Bazy (tylko w treningu z rundami):
+Bazy (w treningu z rundami i w meczach):
 - Wróg stoi w bazie, a obrońcy nie ma: oblężenie rośnie. Po 600 krokach baza upada.
 - Plemię bez bazy ginie do końca rundy, a jego pola stają się neutralne.
 - Zdobywcy stojący w bazie trafiają na listę rodziców.
@@ -77,6 +78,25 @@ Strojenie (5 ziaren po 2 000 000 kroków, ostatnie 500 000 kroków). Koszt ataku
 Rozmnażanie na własnych polach (`2026-11-01_20-52_dlugi_wlasne_pola`, ostatnie 500 000 kroków): narodziny 26513 wobec 1451 bez dziedziczenia, odrodzenia 8296 i 13701, zabójstwa 2325 i 515, żywi na plemię 14,5 i 5,1. Narodziny przewyższają odrodzenia na każdym ziarnie, ale ich wzrost prawie stanął w ostatnim okresie. Na końcu jedno plemię często dominuje (np. 2792 pola wobec 45), a bez dziedziczenia zwykle są wyrównane. Trafia około 1% ataków.
 
 Rundy wobec ciągłego świata (`2026-11-01_22-23_rundy_dlugi`, 5 ziaren po 2 000 000 kroków, potem mecze po 100 000 kroków w obie strony na 3 nowych mapach): rundy 50 000 wygrały 15/15 (pola 69018 wobec 17450), 100 000 i 200 000 po 12/15, oba przegrywając na ziarnie 1001. Mecz przypomina start rundy, więc format sprzyja modelom z rund. Około 1% ataków nadal trafia.
+
+Dwie populacje po 2 mln kroków (2026-11-03, ziarna 2026 i 2027), mecze po 100 000 kroków w obie strony na mapach 3001–3003:
+
+| mecz | wygrał 2026 | wygrał 2027 |
+|---|---|---|
+| bez oblężeń (tylko pola) | 6 | 0 |
+| z oblężeniami | 1 | 5 |
+
+W treningu 2027 upadki baz rosły co 10% przebiegu (od 2 do 41), a trafienia od 0,3% do 3–4%. Wniosek: mecz bez oblężeń mierzył tylko zajmowanie pól, a z oblężeniami wygrywa model, który nauczył się zdobywać bazy.
+
+Sprawdzenie na kolejnych 5 ziarnach (2028–2032, po 2 mln kroków). Upadki baz w 4 ćwiartkach:
+
+| ziarno | upadki | trafienia na końcu |
+|---|---|---|
+| 2026 | 2, 0, 3, 9 | 0,2% |
+| 2027 | 9, 39, 40, 88 | 3,3% |
+| 2028–2032 razem | 23, 38, 24, 17 | 0,3–0,7% |
+
+Wniosek: ziarno 2027 to wyjątek, a na pozostałych 6 ziarnach agenci nadal nie uczą się zdobywać baz. Umiejętność da się wyewoluować, ale rzadko.
 
 ## Następne kroki
 1. Cechy agentów dopiero po działających rundach.

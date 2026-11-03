@@ -24,6 +24,7 @@ const MAP_ROWS: usize = 60;
 const MAP_COLS: usize = 60;
 const TILE_SIZE: f32 = 25.0;
 const BASE_SIZE: usize = 5;
+const ATTACK_FLASH_STEPS: u32 = 30;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Mode{
@@ -78,7 +79,9 @@ pub struct World{
     start_food: usize,
     round_steps: u64,
     round: u64,
-    round_start: u64
+    round_start: u64,
+    match_sieges: bool,
+    attack_flashes: Vec<AttackFlash>
 }
 
 impl World{
@@ -136,7 +139,9 @@ impl World{
             start_food: num_food,
             round_steps: ROUND_STEPS,
             round: start_step / ROUND_STEPS,
-            round_start: start_step
+            round_start: start_step,
+            match_sieges: false,
+            attack_flashes: Vec::new()
         }
     }
 
@@ -146,9 +151,18 @@ impl World{
         self.round = self.start_step / round_steps.max(1);
     }
 
-    // Demo tylko pokazuje model, wiec nie ma w nim rund ani zdobywania baz
+    // Demo tylko pokazuje model, wiec nie ma w nim rund
     fn rounds_enabled(&self) -> bool{
         self.mode != Mode::Demo && self.round_steps > 0
+    }
+
+    // Mecz jest bez nauki jak demo, ale bazy mozna w nim zdobywac, zeby sprawdzic i te umiejetnosc
+    pub fn enable_match_sieges(&mut self){
+        self.match_sieges = true;
+    }
+
+    fn sieges_enabled(&self) -> bool{
+        self.rounds_enabled() || self.match_sieges
     }
 
     pub fn handle_input(&mut self){
@@ -206,8 +220,12 @@ impl World{
             }
         }
         self.terrain.update_capture_status();
+        for flash in &mut self.attack_flashes{
+            flash.steps_left -= 1;
+        }
+        self.attack_flashes.retain(|flash| flash.steps_left > 0);
         self.resolve_attacks(&attacks);
-        if self.rounds_enabled(){
+        if self.sieges_enabled(){
             self.update_sieges();
         }
 
@@ -250,6 +268,7 @@ impl World{
         self.terrain = Terrain::new(MAP_ROWS, MAP_COLS, TILE_SIZE, BASE_SIZE, self.seed.wrapping_add(self.round as u32));
         self.food = starting_food(&self.terrain, self.start_food);
         self.agents.clear();
+        self.attack_flashes.clear();
         self.round_start = self.total_steps();
         for tribe in &mut self.tribes{
             tribe.restore();
@@ -316,7 +335,16 @@ impl World{
                 continue;
             };
             self.stats.add_attack(attacker.tribe());
-            if !attacker.can_hit(target){
+            let hit = attacker.can_hit(target);
+            self.attack_flashes.push(AttackFlash{
+                x: attacker.get_x(),
+                y: attacker.get_y(),
+                target_x: target.get_x(),
+                target_y: target.get_y(),
+                hit,
+                steps_left: ATTACK_FLASH_STEPS
+            });
+            if !hit{
                 continue;
             }
             self.stats.add_hit(attacker.tribe());
@@ -552,6 +580,8 @@ impl World{
             f.draw();
         }
 
+        self.draw_attacks();
+
         set_default_camera();
 
         self.draw_stats();
@@ -569,6 +599,31 @@ impl World{
             }
         }
     }
+
+    // Trafienie to czerwona linia do celu, a pudlo blady okrag wokol atakujacego.
+    // Pudel jest bardzo duzo, wiec linie do celu zaslonilyby cala mape.
+    fn draw_attacks(&self){
+        for flash in &self.attack_flashes{
+            let fade = flash.steps_left as f32 / ATTACK_FLASH_STEPS as f32;
+            if flash.hit{
+                draw_line(flash.x, flash.y, flash.target_x, flash.target_y, 2.0, Color::new(1.0, 0.15, 0.15, fade));
+                draw_circle_lines(flash.target_x, flash.target_y, 6.0, 1.5, Color::new(1.0, 0.15, 0.15, fade));
+            }
+            else{
+                draw_circle_lines(flash.x, flash.y, 5.0, 1.0, Color::new(1.0, 1.0, 1.0, 0.4 * fade));
+            }
+        }
+    }
+}
+
+// Slad ataku widoczny przez kilka krokow
+struct AttackFlash{
+    x: f32,
+    y: f32,
+    target_x: f32,
+    target_y: f32,
+    hit: bool,
+    steps_left: u32
 }
 
 // Runda konczy sie po limicie krokow albo gdy zostalo tylko jedno plemie
