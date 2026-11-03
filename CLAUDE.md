@@ -98,5 +98,17 @@ Sprawdzenie na kolejnych 5 ziarnach (2028–2032, po 2 mln kroków). Upadki baz 
 
 Wniosek: ziarno 2027 to wyjątek, a na pozostałych 6 ziarnach agenci nadal nie uczą się zdobywać baz. Umiejętność da się wyewoluować, ale rzadko.
 
+Liczba neuronów ukrytych (stała `HIDDEN` w `src/brain.rs`), 2 serie po 5 ziaren, po 2 mln kroków. Suma upadków baz:
+
+| neurony | ziarna 2028–2032 | ziarna 2033–2037 | razem |
+|---|---|---|---|
+| 8 | 102 | 319 | 421 |
+| 12 | 171 | 179 | 350 |
+| 16 | 247 | 181 | 428 |
+| 24 | 402 | 215 | 617 |
+| 32 | 179 | 103 | 282 |
+
+Wniosek: druga seria nie potwierdziła pierwszej (8 neuronów wypadło w niej najlepiej). Wyniki zależą głównie od pojedynczych ziaren, które dają ponad 100 upadków. Pewne jest tylko to, że 32 neurony są najsłabsze w obu seriach, a zmiana liczby neuronów nie daje pewnej poprawy.
+
 ## Następne kroki
 1. Cechy agentów dopiero po działających rundach.
