@@ -8,6 +8,8 @@ Symulacja plemion w Ruście (macroquad). Celem jest neuroewolucja: każdy agent 
 - Po zmianie opisz strukturę: co zmieniło się w którym pliku i jakie funkcje. Nie wklejaj kodu, chyba że użytkownik o to poprosi.
 - Commituj i pushuj tylko na prośbę, bezpośrednio na `master`, bez dodatkowych gałęzi.
 - Nie dodawaj do commitów linijki `Co-Authored-By`.
+- Odpowiadaj konkretnie: wynik w 1–2 zdaniach, jedna propozycja.
+- Na koniec dnia pracy zaktualizuj `HANDOFF.md` (stan, wyniki, co dalej), zacommituj i wypchnij, żeby dało się zacząć na laptopie albo na PC.
 
 ## Założenia
 - Teraz liczy się dobra podstawa pod sieć, a nie dopracowane zachowanie. Decyzje agentów mają dać się łatwo zastąpić siecią.
@@ -135,4 +137,5 @@ Narodziny rosną na każdym ziarnie do 12–15 tys. na odcinek, a trafienia do 0
 Mecze z oblężeniami, model po 10 mln wobec modelu z tego samego ziarna po 2 mln (5 ziaren, 3 mapy, obie strony, 30 meczów): 10 mln wygrał 27/30, choć zdobył mniej baz (15 wobec 24). Wniosek: dłuższy trening daje lepszą obronę i przetrwanie, a nie lepszy atak.
 
 ## Następne kroki
-1. Cechy agentów dopiero po działających rundach.
+1. Nowe wejścia albo cechy agentów, dopisywane na końcu listy wejść.
+2. Trening na noc dopiero, gdy wejścia i zasady będą gotowe.
